@@ -1,7 +1,16 @@
 target/
+out/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
+### CampusBuddy local runtime artifacts & secrets ###
+data/
+*.db
+*.db-journal
+*.db-wal
+*.ics
+.env
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

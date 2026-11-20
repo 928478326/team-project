@@ -1,0 +1,171 @@
+package view;
+
+import interface_adapter.account.AccountState;
+import interface_adapter.account.AccountViewModel;
+import interface_adapter.account.LoginController;
+import interface_adapter.account.SignupController;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.util.Objects;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTabbedPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+
+/**
+ * Login &amp; Registration Swing view.
+ *
+ * <p><b>Owner: Track A (Data Platform &amp; Auth Lead)</b>
+ */
+public final class AccountView extends JPanel implements PropertyChangeListener {
+
+    private final AccountViewModel viewModel;
+    private final JTextField loginUsernameField = new JTextField(18);
+    private final JPasswordField loginPasswordField = new JPasswordField(18);
+    private final JTextField signupUsernameField = new JTextField(18);
+    private final JPasswordField signupPasswordField = new JPasswordField(18);
+    private final JPasswordField signupConfirmField = new JPasswordField(18);
+    private final JLabel feedbackLabel = new JLabel(" ");
+
+    private LoginController loginController;
+    private SignupController signupController;
+
+    public AccountView(AccountViewModel viewModel) {
+        this.viewModel = Objects.requireNonNull(viewModel, "viewModel must not be null");
+        this.viewModel.addPropertyChangeListener(this);
+
+        setLayout(new BorderLayout(12, 12));
+        setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+
+        JLabel title = new JLabel("CampusBuddy — UofT Student Buddy Finder", JLabel.CENTER);
+        add(title, BorderLayout.NORTH);
+
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.addTab("Login", buildLoginPanel());
+        tabs.addTab("Sign Up", buildSignupPanel());
+        add(tabs, BorderLayout.CENTER);
+
+        feedbackLabel.setHorizontalAlignment(JLabel.CENTER);
+        add(feedbackLabel, BorderLayout.SOUTH);
+    }
+
+    public String getViewName() {
+        return viewModel.getViewName();
+    }
+
+    public void setLoginController(LoginController loginController) {
+        this.loginController = loginController;
+    }
+
+    public void setSignupController(SignupController signupController) {
+        this.signupController = signupController;
+    }
+
+    private JPanel buildLoginPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 6, 6, 6);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panel.add(new JLabel("Username:"), gbc);
+        gbc.gridx = 1;
+        panel.add(loginUsernameField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        panel.add(new JLabel("Password:"), gbc);
+        gbc.gridx = 1;
+        panel.add(loginPasswordField, gbc);
+
+        JButton loginButton = new JButton("Log In");
+        loginButton.addActionListener(
+                e -> {
+                    if (loginController != null) {
+                        loginController.execute(
+                                loginUsernameField.getText(),
+                                new String(loginPasswordField.getPassword()));
+                    }
+                });
+        gbc.gridx = 1;
+        gbc.gridy = 2;
+        panel.add(loginButton, gbc);
+        return panel;
+    }
+
+    private JPanel buildSignupPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 6, 6, 6);
+        gbc.anchor = GridBagConstraints.WEST;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panel.add(new JLabel("Username:"), gbc);
+        gbc.gridx = 1;
+        panel.add(signupUsernameField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        panel.add(new JLabel("Password:"), gbc);
+        gbc.gridx = 1;
+        panel.add(signupPasswordField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        panel.add(new JLabel("Confirm Password:"), gbc);
+        gbc.gridx = 1;
+        panel.add(signupConfirmField, gbc);
+
+        JButton signupButton = new JButton("Create Account");
+        signupButton.addActionListener(
+                e -> {
+                    if (signupController != null) {
+                        signupController.execute(
+                                signupUsernameField.getText(),
+                                new String(signupPasswordField.getPassword()),
+                                new String(signupConfirmField.getPassword()));
+                    }
+                });
+        gbc.gridx = 1;
+        gbc.gridy = 3;
+        panel.add(signupButton, gbc);
+        return panel;
+    }
+
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+        if (!AccountViewModel.STATE_PROPERTY.equals(evt.getPropertyName())) {
+            return;
+        }
+        AccountState state = (AccountState) evt.getNewValue();
+        Runnable updateTask =
+                () -> {
+                    // TODO [Track A]: Polish AccountView feedback and clear password fields on success.
+                    if (!state.getErrorMessage().isBlank()) {
+                        feedbackLabel.setForeground(Color.RED);
+                        feedbackLabel.setText(state.getErrorMessage());
+                    } else if (!state.getStatusMessage().isBlank()) {
+                        feedbackLabel.setForeground(new Color(0, 120, 0));
+                        feedbackLabel.setText(state.getStatusMessage());
+                    } else {
+                        feedbackLabel.setText(" ");
+                    }
+                };
+        if (SwingUtilities.isEventDispatchThread()) {
+            updateTask.run();
+        } else {
+            SwingUtilities.invokeLater(updateTask);
+        }
+    }
+}
