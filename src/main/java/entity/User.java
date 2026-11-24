@@ -1,28 +1,32 @@
 package entity;
 
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * Core domain entity representing a CampusBuddy student user.
- * Immutable to protect enterprise invariants across layers.
+ * Core domain entity representing a CampusBuddy student user, organized around a strict
+ * <b>3-Tier Profile Visibility Model</b>:
+ * <ol>
+ *   <li>{@link PublicProfile} — visible to the student and to peers on campus</li>
+ *   <li>{@link PrivateProfile} — visible &amp; editable ONLY by the student themselves
+ *       (e.g., UofT {@code utorid} verification and contact privacy preferences)</li>
+ *   <li>{@link LlmPersona} + {@code passwordHash} — strictly internal system/LLM state,
+ *       invisible to all UI views including the student themselves</li>
+ * </ol>
  */
 public final class User {
 
     private final String userId;
     private final String username;
     private final String passwordHash;
-    private final String displayName;
-    private final String bio;
-    private final String contactInfo;
-    private final WeekendStyle weekendStyle;
-    private final Set<String> interestedCommunityIds;
+    private final PublicProfile publicProfile;
+    private final PrivateProfile privateProfile;
+    private final LlmPersona llmPersona;
 
     /**
-     * Constructs an immutable {@code User} while enforcing core domain invariants.
+     * Constructs an immutable {@code User} with default self-only {@link PrivateProfile}
+     * and empty {@link LlmPersona} (preserving full backward compatibility across all tracks).
      *
      * @param userId unique identifier (non-blank)
      * @param username login handle, normalized to trimmed lowercase (non-blank)
@@ -42,23 +46,40 @@ public final class User {
             String contactInfo,
             WeekendStyle weekendStyle,
             Set<String> interestedCommunityIds) {
+        this(
+                userId,
+                username,
+                passwordHash,
+                new PublicProfile(
+                        displayName, bio, contactInfo, weekendStyle, interestedCommunityIds),
+                PrivateProfile.defaultUnverified(),
+                LlmPersona.empty());
+    }
+
+    /**
+     * Canonical constructor assembling all three profile visibility tiers explicitly.
+     *
+     * @param userId unique identifier (non-blank)
+     * @param username login handle, normalized to trimmed lowercase (non-blank)
+     * @param passwordHash hashed password (non-blank)
+     * @param publicProfile Tier 1 public profile (non-null)
+     * @param privateProfile Tier 2 self-only private &amp; verification profile (non-null)
+     * @param llmPersona Tier 3 system-maintained hidden LLM persona (non-null)
+     */
+    public User(
+            String userId,
+            String username,
+            String passwordHash,
+            PublicProfile publicProfile,
+            PrivateProfile privateProfile,
+            LlmPersona llmPersona) {
         this.userId = requireNonBlank(userId, "userId");
         this.username = normalizeUsername(username);
         this.passwordHash = requireNonBlank(passwordHash, "passwordHash");
-        this.displayName = requireNonBlank(displayName, "displayName");
-        this.bio = bio == null ? "" : bio.trim();
-        this.contactInfo = contactInfo == null ? "" : contactInfo.trim();
-        this.weekendStyle = Objects.requireNonNull(weekendStyle, "weekendStyle must not be null");
-
-        Set<String> normalizedCommunities = new LinkedHashSet<>();
-        if (interestedCommunityIds != null) {
-            for (String communityId : interestedCommunityIds) {
-                if (communityId != null && !communityId.isBlank()) {
-                    normalizedCommunities.add(communityId.trim().toLowerCase(Locale.ROOT));
-                }
-            }
-        }
-        this.interestedCommunityIds = Collections.unmodifiableSet(normalizedCommunities);
+        this.publicProfile = Objects.requireNonNull(publicProfile, "publicProfile must not be null");
+        this.privateProfile =
+                Objects.requireNonNull(privateProfile, "privateProfile must not be null");
+        this.llmPersona = Objects.requireNonNull(llmPersona, "llmPersona must not be null");
     }
 
     /**
@@ -76,8 +97,8 @@ public final class User {
     }
 
     /**
-     * Returns a new {@code User} with updated editable profile fields while preserving
-     * {@code userId}, {@code username}, and {@code passwordHash}.
+     * Returns a new {@code User} with updated Tier 1 public profile fields while preserving
+     * identity, {@link PrivateProfile}, and {@link LlmPersona}.
      *
      * @param newDisplayName updated display name (non-blank)
      * @param newBio updated bio text
@@ -92,15 +113,72 @@ public final class User {
             String newContactInfo,
             WeekendStyle newWeekendStyle,
             Set<String> newInterestedCommunityIds) {
-        return new User(
-                this.userId,
-                this.username,
-                this.passwordHash,
+        final PublicProfile updatedPublic = new PublicProfile(
                 newDisplayName,
                 newBio,
                 newContactInfo,
                 newWeekendStyle,
                 newInterestedCommunityIds);
+        return new User(
+                this.userId,
+                this.username,
+                this.passwordHash,
+                updatedPublic,
+                this.privateProfile,
+                this.llmPersona);
+    }
+
+    /**
+     * Returns a new {@code User} updating both user-editable tiers ({@link PublicProfile} and
+     * self-only {@link PrivateProfile}) while strictly preserving {@link LlmPersona}.
+     *
+     * @param newPublicProfile updated Tier 1 public profile (non-null)
+     * @param newPrivateProfile updated Tier 2 self-only profile (non-null)
+     * @return updated immutable {@code User}
+     */
+    public User withEditableProfile(
+            PublicProfile newPublicProfile, PrivateProfile newPrivateProfile) {
+        return new User(
+                this.userId,
+                this.username,
+                this.passwordHash,
+                newPublicProfile,
+                newPrivateProfile,
+                this.llmPersona);
+    }
+
+    /**
+     * Returns a new {@code User} with updated Tier 2 self-only privacy/verification settings
+     * while preserving {@link PublicProfile} and {@link LlmPersona}.
+     *
+     * @param newPrivateProfile updated Tier 2 private profile (non-null)
+     * @return updated immutable {@code User}
+     */
+    public User withPrivateProfile(PrivateProfile newPrivateProfile) {
+        return new User(
+                this.userId,
+                this.username,
+                this.passwordHash,
+                this.publicProfile,
+                newPrivateProfile,
+                this.llmPersona);
+    }
+
+    /**
+     * Domain entry point for LLM / backend profile enrichment: returns a new {@code User} with
+     * an updated hidden {@link LlmPersona} while preserving all user-visible profile tiers.
+     *
+     * @param newLlmPersona updated Tier 3 hidden persona (non-null)
+     * @return updated immutable {@code User}
+     */
+    public User withLlmPersona(LlmPersona newLlmPersona) {
+        return new User(
+                this.userId,
+                this.username,
+                this.passwordHash,
+                this.publicProfile,
+                this.privateProfile,
+                newLlmPersona);
     }
 
     /**
@@ -125,24 +203,55 @@ public final class User {
         return passwordHash;
     }
 
+    public PublicProfile getPublicProfile() {
+        return publicProfile;
+    }
+
+    public PrivateProfile getPrivateProfile() {
+        return privateProfile;
+    }
+
+    public LlmPersona getLlmPersona() {
+        return llmPersona;
+    }
+
     public String getDisplayName() {
-        return displayName;
+        return publicProfile.getDisplayName();
     }
 
     public String getBio() {
-        return bio;
+        return publicProfile.getBio();
     }
 
     public String getContactInfo() {
-        return contactInfo;
+        return publicProfile.getContactInfo();
+    }
+
+    /**
+     * Returns the peer-safe contact display string honoring {@link PrivateProfile#isShareContactInfo()}.
+     *
+     * @return raw contact handle if sharing is enabled, otherwise privacy placeholder
+     */
+    public String getPublicContactInfo() {
+        return privateProfile.maskContactInfo(publicProfile.getContactInfo());
+    }
+
+    /**
+     * Returns whether this user has verified UofT student status (safe to display on peer cards
+     * without revealing the underlying UTORid).
+     *
+     * @return {@code true} if verified UofT student
+     */
+    public boolean isUoftVerified() {
+        return privateProfile.isUoftVerified();
     }
 
     public WeekendStyle getWeekendStyle() {
-        return weekendStyle;
+        return publicProfile.getWeekendStyle();
     }
 
     public Set<String> getInterestedCommunityIds() {
-        return interestedCommunityIds;
+        return publicProfile.getInterestedCommunityIds();
     }
 
     private static String requireNonBlank(String value, String fieldName) {
