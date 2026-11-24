@@ -40,33 +40,36 @@ public final class SignupInteractor implements SignupInputBoundary {
         final String password = inputData.getPassword();
         if (inputData.getUsername().isBlank()) {
             outputBoundary.prepareFailView("Enter a username.");
-            return;
         }
-        if (password.isBlank() || password.length() < MIN_PASSWORD_LENGTH) {
+        else if (password.isBlank() || password.length() < MIN_PASSWORD_LENGTH) {
             outputBoundary.prepareFailView("Enter a password of at least " + MIN_PASSWORD_LENGTH + " characters.");
-            return;
         }
-        if (!password.equals(inputData.getConfirmPassword())) {
+        else if (!password.equals(inputData.getConfirmPassword())) {
             outputBoundary.prepareFailView("The passwords do not match.");
-            return;
         }
+        else {
+            createAccount(inputData.getUsername(), password);
+        }
+    }
 
+    private void createAccount(String username, String password) {
         final User user = userFactory.create(UUID.randomUUID().toString(),
-                User.normalizeUsername(inputData.getUsername()), passwordHasher.hash(password));
-        final boolean created;
+                User.normalizeUsername(username), passwordHasher.hash(password));
+        String failure = "";
         try {
-            created = dataAccess.saveUser(user);
+            if (!dataAccess.saveUser(user)) {
+                failure = "That username is already taken.";
+            }
         }
         catch (IllegalStateException ex) {
-            outputBoundary.prepareFailView("Could not save the account. Please try again.");
-            return;
+            failure = "Could not save the account. Please try again.";
         }
-        if (created) {
+        if (failure.isEmpty()) {
             outputBoundary.prepareSuccessView(new SignupOutputData(
                     user.getUserId(), user.getUsername(), user.getDisplayName()));
         }
         else {
-            outputBoundary.prepareFailView("That username is already taken.");
+            outputBoundary.prepareFailView(failure);
         }
     }
 }

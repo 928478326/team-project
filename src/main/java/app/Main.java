@@ -1,6 +1,7 @@
 package app;
 
 import java.time.Clock;
+
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
@@ -20,7 +21,8 @@ public final class Main {
 
     public static final String DEFAULT_SQLITE_PATH = "data/campusbuddy.db";
 
-    private Main() {}
+    private Main() {
+    }
 
     /**
      * Launches the CampusBuddy desktop UI on the Swing Event Dispatch Thread.
@@ -33,34 +35,39 @@ public final class Main {
         for (String arg : args) {
             if ("--sqlite".equals(arg)) {
                 useSqlite = true;
-            } else if (arg.startsWith("--dev-user=")) {
+            }
+            else if (arg.startsWith("--dev-user=")) {
                 devUser = arg.substring("--dev-user=".length());
             }
         }
 
-        final DataAccessBundle bundle =
-                useSqlite
-                        ? new SqliteDataAccessBundle(DEFAULT_SQLITE_PATH)
-                        : new InMemoryDataAccessBundle();
-        final String preAuthUser = useSqlite ? null : devUser;
+        final DataAccessBundle bundle;
+        final String preAuthUser;
+        if (useSqlite) {
+            bundle = new SqliteDataAccessBundle(DEFAULT_SQLITE_PATH);
+            preAuthUser = null;
+        }
+        else {
+            bundle = new InMemoryDataAccessBundle();
+            preAuthUser = devUser;
+        }
+        SwingUtilities.invokeLater(() -> showApplication(bundle, preAuthUser));
+    }
 
-        SwingUtilities.invokeLater(
-                () -> {
-                    JFrame application =
-                            new AppBuilder(bundle, Clock.systemUTC(), AppBuilder.TORONTO_ZONE)
-                                    .addAccountAndShellViews()
-                                    .addCommunityAndCalendarViews()
-                                    .addCourseMatchAndRatingViews()
-                                    .addProfileAndRecommendView()
-                                    .addAuthUseCases()
-                                    .addCommunityAndCalendarUseCases()
-                                    .addCourseMatchAndRatingUseCases()
-                                    .addProfileAndRecommendUseCases()
-                                    .preAuthenticateDevUser(preAuthUser)
-                                    .build();
-                    application.pack();
-                    application.setLocationRelativeTo(null);
-                    application.setVisible(true);
-                });
+    private static void showApplication(DataAccessBundle bundle, String preAuthUser) {
+        final JFrame application = new AppBuilder(bundle, Clock.systemUTC(), AppBuilder.TORONTO_ZONE)
+                .addAccountAndShellViews()
+                .addCommunityAndCalendarViews()
+                .addCourseMatchAndRatingViews()
+                .addProfileAndRecommendView()
+                .addAuthUseCases()
+                .addCommunityAndCalendarUseCases()
+                .addCourseMatchAndRatingUseCases()
+                .addProfileAndRecommendUseCases()
+                .preAuthenticateDevUser(preAuthUser)
+                .build();
+        application.pack();
+        application.setLocationRelativeTo(null);
+        application.setVisible(true);
     }
 }

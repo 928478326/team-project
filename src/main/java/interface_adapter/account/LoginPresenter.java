@@ -1,9 +1,10 @@
 package interface_adapter.account;
 
+import java.util.Objects;
+
 import interface_adapter.SessionState;
 import interface_adapter.SessionViewModel;
 import interface_adapter.ViewManagerModel;
-import java.util.Objects;
 import use_case.login.LoginOutputBoundary;
 import use_case.login.LoginOutputData;
 
@@ -32,7 +33,7 @@ public final class LoginPresenter implements LoginOutputBoundary {
 
     @Override
     public void prepareSuccessView(LoginOutputData outputData) {
-        AccountState state = accountViewModel.getState();
+        final AccountState state = accountViewModel.getState();
         state.setErrorMessage("");
         state.setStatusMessage("");
         accountViewModel.firePropertyChanged();
@@ -50,7 +51,7 @@ public final class LoginPresenter implements LoginOutputBoundary {
 
     @Override
     public void prepareFailView(String errorMessage) {
-        AccountState state = accountViewModel.getState();
+        final AccountState state = accountViewModel.getState();
         state.setStatusMessage("");
         state.setErrorMessage(errorMessage);
         accountViewModel.firePropertyChanged();

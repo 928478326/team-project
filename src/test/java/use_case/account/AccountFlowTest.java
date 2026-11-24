@@ -12,7 +12,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import data_access.in_memory.InMemoryCampusBuddyStore;
 import data_access.in_memory.InMemoryUserDataAccess;
-import data_access.in_memory.Sha256PasswordHasher;
 import entity.CommonUserFactory;
 import entity.PasswordHasher;
 import entity.User;
@@ -34,7 +33,7 @@ class AccountFlowTest {
     private final AccountViewModel account = new AccountViewModel();
     private final SessionViewModel session = new SessionViewModel();
     private final ViewManagerModel pages = new ViewManagerModel();
-    private final PasswordHasher hasher = new Sha256PasswordHasher();
+    private final PasswordHasher hasher = password -> "test-hash-" + password;
     private final SignupPresenter signupPresenter = new SignupPresenter(account, session, pages);
     private final LoginPresenter loginPresenter = new LoginPresenter(account, session, pages);
     private final SignupInteractor signup = new SignupInteractor(

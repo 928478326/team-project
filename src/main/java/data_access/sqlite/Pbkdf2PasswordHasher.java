@@ -32,19 +32,20 @@ public final class Pbkdf2PasswordHasher implements PasswordHasher {
     @Override
     public boolean matches(String password, String encoded) {
         final String[] parts = encoded.split(SEPARATOR, -1);
-        if (parts.length != ENCODING_PARTS || !FORMAT.equals(parts[0])) {
-            return false;
+        boolean matched = false;
+        if (parts.length == ENCODING_PARTS && FORMAT.equals(parts[0])) {
+            try {
+                final Base64.Decoder decoder = Base64.getDecoder();
+                final byte[] salt = decoder.decode(parts[1]);
+                final byte[] expected = decoder.decode(parts[2]);
+                matched = salt.length == SALT_BYTES && expected.length == KEY_BITS / Byte.SIZE
+                        && MessageDigest.isEqual(expected, derive(password, salt));
+            }
+            catch (IllegalArgumentException invalidEncoding) {
+                matched = false;
+            }
         }
-        try {
-            final Base64.Decoder decoder = Base64.getDecoder();
-            final byte[] salt = decoder.decode(parts[1]);
-            final byte[] expected = decoder.decode(parts[2]);
-            return salt.length == SALT_BYTES && expected.length == KEY_BITS / Byte.SIZE
-                    && MessageDigest.isEqual(expected, derive(password, salt));
-        }
-        catch (IllegalArgumentException invalidEncoding) {
-            return false;
-        }
+        return matched;
     }
 
     private byte[] derive(String password, byte[] salt) {

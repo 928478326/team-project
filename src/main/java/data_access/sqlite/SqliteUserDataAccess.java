@@ -33,10 +33,8 @@ public final class SqliteUserDataAccess
                 + "ON CONFLICT(username) DO NOTHING";
         try (Connection connection = database.openConnection();
                 PreparedStatement sql = connection.prepareStatement(insert)) {
-            sql.setString(1, user.getUserId());
-            sql.setString(2, user.getUsername());
-            sql.setString(3, user.getPasswordHash());
-            bindProfile(sql, 4, user);
+            final int profileStart = bindStrings(sql, 1, user.getUserId(), user.getUsername(), user.getPasswordHash());
+            bindProfile(sql, profileStart, user);
             return sql.executeUpdate() == 1;
         }
         catch (SQLException ex) {
@@ -59,22 +57,27 @@ public final class SqliteUserDataAccess
                 PreparedStatement sql = connection.prepareStatement(query)) {
             sql.setString(1, value);
             try (ResultSet row = sql.executeQuery()) {
-                if (!row.next()) {
-                    return Optional.empty();
+                Optional<User> found = Optional.empty();
+                if (row.next()) {
+                    found = Optional.of(readUser(row));
                 }
-                final JSONArray interests = new JSONArray(row.getString("interested_communities"));
-                final Set<String> ids = new LinkedHashSet<>();
-                for (int i = 0; i < interests.length(); i++) {
-                    ids.add(interests.getString(i));
-                }
-                return Optional.of(new User(row.getString("user_id"), row.getString("username"),
-                        row.getString("password_hash"), row.getString("display_name"), row.getString("bio"),
-                        row.getString("contact_info"), WeekendStyle.valueOf(row.getString("weekend_style")), ids));
+                return found;
             }
         }
         catch (SQLException ex) {
             throw new IllegalStateException("Could not read account.", ex);
         }
+    }
+
+    private User readUser(ResultSet row) throws SQLException {
+        final JSONArray interests = new JSONArray(row.getString("interested_communities"));
+        final Set<String> ids = new LinkedHashSet<>();
+        for (int i = 0; i < interests.length(); i++) {
+            ids.add(interests.getString(i));
+        }
+        return new User(row.getString("user_id"), row.getString("username"),
+                row.getString("password_hash"), row.getString("display_name"), row.getString("bio"),
+                row.getString("contact_info"), WeekendStyle.valueOf(row.getString("weekend_style")), ids);
     }
 
     @Override
@@ -83,8 +86,8 @@ public final class SqliteUserDataAccess
                 + "interested_communities=? WHERE user_id=?";
         try (Connection connection = database.openConnection();
                 PreparedStatement sql = connection.prepareStatement(update)) {
-            bindProfile(sql, 1, user);
-            sql.setString(6, user.getUserId());
+            final int idParameter = bindProfile(sql, 1, user);
+            sql.setString(idParameter, user.getUserId());
             if (sql.executeUpdate() == 0) {
                 throw new IllegalArgumentException("Unknown user ID.");
             }
@@ -94,11 +97,17 @@ public final class SqliteUserDataAccess
         }
     }
 
-    private void bindProfile(PreparedStatement sql, int first, User user) throws SQLException {
-        sql.setString(first, user.getDisplayName());
-        sql.setString(first + 1, user.getBio());
-        sql.setString(first + 2, user.getContactInfo());
-        sql.setString(first + 3, user.getWeekendStyle().name());
-        sql.setString(first + 4, new JSONArray(user.getInterestedCommunityIds()).toString());
+    private int bindProfile(PreparedStatement sql, int first, User user) throws SQLException {
+        return bindStrings(sql, first, user.getDisplayName(), user.getBio(), user.getContactInfo(),
+                user.getWeekendStyle().name(), new JSONArray(user.getInterestedCommunityIds()).toString());
+    }
+
+    private int bindStrings(PreparedStatement sql, int first, String... values) throws SQLException {
+        int parameter = first;
+        for (String value : values) {
+            sql.setString(parameter, value);
+            parameter++;
+        }
+        return parameter;
     }
 }

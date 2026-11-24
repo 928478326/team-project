@@ -79,6 +79,7 @@ public final class SqliteDatabase {
      * Seeds the 5 demo student accounts and initial demo data when the {@code users} table is empty.
      *
      * @param passwordHasher password hasher for demo account passwords
+     * @throws UnsupportedOperationException until the demo fixtures are implemented
      */
     public void seedDemoDataIfEmpty(PasswordHasher passwordHasher) {
         // TODO [Track A]: If SELECT COUNT(*) FROM users == 0, insert demo accounts

@@ -36,14 +36,14 @@ public final class InMemoryUserDataAccess
     @Override
     public boolean saveUser(User user) {
         synchronized (store) {
-            if (existsByUsername(user.getUsername())) {
-                return false;
+            final boolean available = !existsByUsername(user.getUsername());
+            if (available) {
+                if (store.usersById().containsKey(user.getUserId())) {
+                    throw new IllegalStateException("User ID is already in use.");
+                }
+                store.putUser(user);
             }
-            if (store.usersById().containsKey(user.getUserId())) {
-                throw new IllegalStateException("User ID is already in use.");
-            }
-            store.putUser(user);
-            return true;
+            return available;
         }
     }
 
@@ -51,10 +51,7 @@ public final class InMemoryUserDataAccess
     public Optional<User> findByUsername(String normalizedUsername) {
         synchronized (store) {
             final String userId = store.userIdByUsername().get(normalizedUsername);
-            if (userId == null) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(store.usersById().get(userId));
+            return Optional.ofNullable(userId).map(store.usersById()::get);
         }
     }
 

@@ -32,24 +32,29 @@ public final class LoginInteractor implements LoginInputBoundary {
     public void execute(LoginInputData inputData) {
         if (inputData.getUsername().isBlank() || inputData.getPassword().isBlank()) {
             outputBoundary.prepareFailView("Enter your username and password.");
-            return;
         }
+        else {
+            authenticate(User.normalizeUsername(inputData.getUsername()), inputData.getPassword());
+        }
+    }
 
-        final Optional<User> account;
+    private void authenticate(String username, String password) {
+        Optional<User> authenticated = Optional.empty();
+        String failure = "Incorrect username or password.";
         try {
-            account = dataAccess.findByUsername(User.normalizeUsername(inputData.getUsername()));
+            authenticated = dataAccess.findByUsername(username)
+                    .filter(user -> passwordHasher.matches(password, user.getPasswordHash()));
         }
         catch (IllegalStateException ex) {
-            outputBoundary.prepareFailView("Could not load the account. Please try again.");
-            return;
+            failure = "Could not load the account. Please try again.";
         }
-        if (account.isEmpty()
-                || !passwordHasher.matches(inputData.getPassword(), account.get().getPasswordHash())) {
-            outputBoundary.prepareFailView("Incorrect username or password.");
-            return;
+        if (authenticated.isPresent()) {
+            final User user = authenticated.get();
+            outputBoundary.prepareSuccessView(new LoginOutputData(
+                    user.getUserId(), user.getUsername(), user.getDisplayName()));
         }
-        final User user = account.get();
-        outputBoundary.prepareSuccessView(new LoginOutputData(
-                user.getUserId(), user.getUsername(), user.getDisplayName()));
+        else {
+            outputBoundary.prepareFailView(failure);
+        }
     }
 }

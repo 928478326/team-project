@@ -1,9 +1,10 @@
 package interface_adapter.account;
 
+import java.util.Objects;
+
 import interface_adapter.SessionState;
 import interface_adapter.SessionViewModel;
 import interface_adapter.ViewManagerModel;
-import java.util.Objects;
 import use_case.signup.SignupOutputBoundary;
 import use_case.signup.SignupOutputData;
 
@@ -32,7 +33,7 @@ public final class SignupPresenter implements SignupOutputBoundary {
 
     @Override
     public void prepareSuccessView(SignupOutputData outputData) {
-        AccountState state = accountViewModel.getState();
+        final AccountState state = accountViewModel.getState();
         state.setErrorMessage("");
         state.setStatusMessage("Registered as " + outputData.getUsername());
         accountViewModel.firePropertyChanged();
@@ -50,7 +51,7 @@ public final class SignupPresenter implements SignupOutputBoundary {
 
     @Override
     public void prepareFailView(String errorMessage) {
-        AccountState state = accountViewModel.getState();
+        final AccountState state = accountViewModel.getState();
         state.setStatusMessage("");
         state.setErrorMessage(errorMessage);
         accountViewModel.firePropertyChanged();
