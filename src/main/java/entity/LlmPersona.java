@@ -12,7 +12,7 @@ import java.util.Objects;
  */
 public final class LlmPersona {
 
-    /** Maximum character length for the synthesized hidden persona summary. */
+    /** Maximum character length for newly synthesized hidden persona summaries. */
     public static final int MAX_SUMMARY_LENGTH = 1000;
 
     private static final LlmPersona EMPTY = new LlmPersona("");
@@ -52,6 +52,23 @@ public final class LlmPersona {
                         "LlmPersona summary must not exceed " + MAX_SUMMARY_LENGTH + " characters.");
             }
             result = new LlmPersona(trimmed);
+        }
+        return result;
+    }
+
+    /**
+     * Restores a persisted {@code LlmPersona} from storage without rejecting pre-existing lengths.
+     *
+     * @param storedSummary stored summary string (null/blank normalized to {@link #empty()})
+     * @return immutable {@code LlmPersona}
+     */
+    public static LlmPersona fromStored(String storedSummary) {
+        final LlmPersona result;
+        if (storedSummary == null || storedSummary.isBlank()) {
+            result = EMPTY;
+        }
+        else {
+            result = new LlmPersona(storedSummary.trim());
         }
         return result;
     }

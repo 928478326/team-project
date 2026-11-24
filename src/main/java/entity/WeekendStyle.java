@@ -32,7 +32,7 @@ public final class WeekendStyle {
     /** Score awarded when two weekend styles have minimal overlap or contrast strongly. */
     public static final int CONTRASTING_STYLE_SCORE = 5;
 
-    /** Maximum allowed character length for a free-text weekend style description. */
+    /** Maximum allowed character length for a newly submitted free-text weekend style. */
     public static final int MAX_LENGTH = 200;
 
     /** Minimum token length considered during local fallback text similarity scoring. */
@@ -74,32 +74,46 @@ public final class WeekendStyle {
     private final String presetCode;
     private final String displayName;
     private final String description;
+    private final String comparisonKey;
 
     private WeekendStyle(String presetCode, String displayName, String description) {
         this.presetCode = presetCode;
         this.displayName = displayName;
         this.description = description;
+        if (presetCode != null) {
+            this.comparisonKey = toComparisonKey(presetCode);
+        }
+        else {
+            this.comparisonKey = toComparisonKey(displayName);
+        }
     }
 
     /**
      * Creates or resolves a {@code WeekendStyle} from either a preset code/label or arbitrary
-     * user-written natural-language text.
+     * user-written natural-language text, enforcing {@value #MAX_LENGTH} characters.
      *
      * @param rawText preset identifier or custom free-text weekend preference (1..200 chars)
      * @return canonical preset instance if matched, otherwise a custom free-text instance
      * @throws IllegalArgumentException if {@code rawText} is null, blank, or exceeds {@value #MAX_LENGTH} chars
      */
     public static WeekendStyle of(String rawText) {
-        if (rawText == null || rawText.isBlank()) {
-            throw new IllegalArgumentException("Weekend style must not be blank.");
-        }
-        final String trimmed = rawText.trim();
+        final String trimmed = requireNonBlank(rawText);
         if (trimmed.length() > MAX_LENGTH) {
             throw new IllegalArgumentException(
                     "Weekend style must not exceed " + MAX_LENGTH + " characters.");
         }
-        final WeekendStyle matchedPreset = PRESETS_BY_KEY.get(trimmed.toUpperCase(Locale.ROOT));
-        return matchedPreset != null ? matchedPreset : new WeekendStyle(null, trimmed, trimmed);
+        return resolveTrimmed(trimmed);
+    }
+
+    /**
+     * Hydrates a persisted weekend style string without rejecting pre-existing stored lengths.
+     *
+     * @param storedText persisted preset code or free-text preference (non-blank)
+     * @return resolved {@link WeekendStyle}
+     * @throws IllegalArgumentException if {@code storedText} is null or blank
+     */
+    public static WeekendStyle fromStored(String storedText) {
+        return resolveTrimmed(requireNonBlank(storedText));
     }
 
     /**
@@ -114,14 +128,14 @@ public final class WeekendStyle {
     }
 
     /**
-     * Persistence factory compatible with {@code Enum.valueOf} callers (e.g., SQLite DAO).
+     * Persistence factory compatible with {@code Enum.valueOf} callers.
      *
      * @param raw stored preset code or custom free-text preference
      * @return resolved {@link WeekendStyle}
-     * @throws IllegalArgumentException if {@code raw} is null, blank, or too long
+     * @throws IllegalArgumentException if {@code raw} is null or blank
      */
     public static WeekendStyle valueOf(String raw) {
-        return of(raw);
+        return fromStored(raw);
     }
 
     /**
@@ -149,7 +163,14 @@ public final class WeekendStyle {
      * @return canonical serialized text
      */
     public String name() {
-        return presetCode != null ? presetCode : displayName;
+        final String result;
+        if (presetCode != null) {
+            result = presetCode;
+        }
+        else {
+            result = displayName;
+        }
+        return result;
     }
 
     /**
@@ -214,14 +235,14 @@ public final class WeekendStyle {
         else {
             final WeekendStyle that = (WeekendStyle) obj;
             equal = this.isPreset() == that.isPreset()
-                    && this.name().equalsIgnoreCase(that.name());
+                    && this.comparisonKey.equals(that.comparisonKey);
         }
         return equal;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(isPreset(), name().toLowerCase(Locale.ROOT));
+        return Objects.hash(isPreset(), comparisonKey);
     }
 
     @Override
@@ -240,6 +261,45 @@ public final class WeekendStyle {
             }
         }
         return tokens;
+    }
+
+    private static String requireNonBlank(String rawText) {
+        if (rawText == null || rawText.isBlank()) {
+            throw new IllegalArgumentException("Weekend style must not be blank.");
+        }
+        return rawText.trim();
+    }
+
+    private static WeekendStyle resolveTrimmed(String trimmed) {
+        final WeekendStyle matchedPreset = PRESETS_BY_KEY.get(toComparisonKey(trimmed));
+        final WeekendStyle resolved;
+        if (matchedPreset != null) {
+            resolved = matchedPreset;
+        }
+        else {
+            resolved = new WeekendStyle(null, trimmed, trimmed);
+        }
+        return resolved;
+    }
+
+    /**
+     * Produces a Unicode case-folded key matching {@code Character.toLowerCase(Character.toUpperCase(cp))}
+     * so {@link #equals(Object)} and {@link #hashCode()} share an identical normalization rule
+     * across all scripts (including Greek final sigma).
+     *
+     * @param text non-null source text
+     * @return case-folded comparison key
+     */
+    private static String toComparisonKey(String text) {
+        final StringBuilder builder = new StringBuilder(text.length());
+        int index = 0;
+        while (index < text.length()) {
+            final int codePoint = text.codePointAt(index);
+            final int folded = Character.toLowerCase(Character.toUpperCase(codePoint));
+            builder.appendCodePoint(folded);
+            index += Character.charCount(codePoint);
+        }
+        return builder.toString();
     }
 
     private static int scoreTokenSimilarity(Set<String> tokensA, Set<String> tokensB) {
@@ -262,12 +322,12 @@ public final class WeekendStyle {
         return score;
     }
 
-    private static int scorePresetPair(String codeA, String codeB) {
+    private static int scorePresetPair(String firstCode, String secondCode) {
         final int score;
-        if (isCompatiblePair(codeA, codeB)) {
+        if (isCompatiblePair(firstCode, secondCode)) {
             score = COMPATIBLE_STYLE_SCORE;
         }
-        else if (isContrastingPair(codeA, codeB)) {
+        else if (isContrastingPair(firstCode, secondCode)) {
             score = CONTRASTING_STYLE_SCORE;
         }
         else {
@@ -276,28 +336,30 @@ public final class WeekendStyle {
         return score;
     }
 
-    private static boolean isCompatiblePair(String a, String b) {
-        return matchesPair(a, b, CODE_INDOOR_CHILL, CODE_STUDY_FOCUS)
-                || matchesPair(a, b, CODE_INDOOR_CHILL, CODE_FOOD_EXPLORE)
-                || matchesPair(a, b, CODE_OUTDOOR_ACTIVE, CODE_SOCIAL_EVENTS)
-                || matchesPair(a, b, CODE_FOOD_EXPLORE, CODE_SOCIAL_EVENTS)
-                || matchesPair(a, b, CODE_OUTDOOR_ACTIVE, CODE_FOOD_EXPLORE);
+    private static boolean isCompatiblePair(String firstCode, String secondCode) {
+        return matchesPair(firstCode, secondCode, CODE_INDOOR_CHILL, CODE_STUDY_FOCUS)
+                || matchesPair(firstCode, secondCode, CODE_INDOOR_CHILL, CODE_FOOD_EXPLORE)
+                || matchesPair(firstCode, secondCode, CODE_OUTDOOR_ACTIVE, CODE_SOCIAL_EVENTS)
+                || matchesPair(firstCode, secondCode, CODE_FOOD_EXPLORE, CODE_SOCIAL_EVENTS)
+                || matchesPair(firstCode, secondCode, CODE_OUTDOOR_ACTIVE, CODE_FOOD_EXPLORE);
     }
 
-    private static boolean isContrastingPair(String a, String b) {
-        return matchesPair(a, b, CODE_STUDY_FOCUS, CODE_SOCIAL_EVENTS)
-                || matchesPair(a, b, CODE_INDOOR_CHILL, CODE_OUTDOOR_ACTIVE);
+    private static boolean isContrastingPair(String firstCode, String secondCode) {
+        return matchesPair(firstCode, secondCode, CODE_STUDY_FOCUS, CODE_SOCIAL_EVENTS)
+                || matchesPair(firstCode, secondCode, CODE_INDOOR_CHILL, CODE_OUTDOOR_ACTIVE);
     }
 
-    private static boolean matchesPair(String a, String b, String first, String second) {
-        return (a.equals(first) && b.equals(second)) || (a.equals(second) && b.equals(first));
+    private static boolean matchesPair(
+            String firstCode, String secondCode, String targetFirst, String targetSecond) {
+        return firstCode.equals(targetFirst) && secondCode.equals(targetSecond)
+                || firstCode.equals(targetSecond) && secondCode.equals(targetFirst);
     }
 
     private static Map<String, WeekendStyle> buildPresetLookup() {
         final Map<String, WeekendStyle> map = new LinkedHashMap<>();
         for (WeekendStyle preset : PRESET_LIST) {
-            map.put(preset.presetCode, preset);
-            map.put(preset.displayName.toUpperCase(Locale.ROOT), preset);
+            map.put(toComparisonKey(preset.presetCode), preset);
+            map.put(toComparisonKey(preset.displayName), preset);
         }
         return Collections.unmodifiableMap(map);
     }

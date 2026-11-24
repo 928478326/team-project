@@ -6,11 +6,12 @@ import java.util.Set;
 
 /**
  * Core domain entity representing a CampusBuddy student user, organized around a strict
- * <b>3-Tier Profile Visibility Model</b>:
+ * 3-Tier Profile Visibility Model.
+ *
  * <ol>
  *   <li>{@link PublicProfile} — visible to the student and to peers on campus</li>
  *   <li>{@link PrivateProfile} — visible &amp; editable ONLY by the student themselves
- *       (e.g., UofT {@code utorid} verification and contact privacy preferences)</li>
+ *       (e.g., UofT {@code utorid} entry, verification state, and contact privacy preferences)</li>
  *   <li>{@link LlmPersona} + {@code passwordHash} — strictly internal system/LLM state,
  *       invisible to all UI views including the student themselves</li>
  * </ol>
@@ -26,32 +27,23 @@ public final class User {
 
     /**
      * Constructs an immutable {@code User} with default self-only {@link PrivateProfile}
-     * and empty {@link LlmPersona} (preserving full backward compatibility across all tracks).
+     * and empty {@link LlmPersona}.
      *
      * @param userId unique identifier (non-blank)
      * @param username login handle, normalized to trimmed lowercase (non-blank)
      * @param passwordHash hashed password (non-blank)
-     * @param displayName visible name (non-blank)
-     * @param bio optional short bio (null normalized to empty string)
-     * @param contactInfo optional contact handle such as Discord/Instagram/email
-     * @param weekendStyle preferred weekend style (non-null)
-     * @param interestedCommunityIds set of community IDs the user is interested in
+     * @param publicProfile Tier 1 public profile (non-null)
      */
     public User(
             String userId,
             String username,
             String passwordHash,
-            String displayName,
-            String bio,
-            String contactInfo,
-            WeekendStyle weekendStyle,
-            Set<String> interestedCommunityIds) {
+            PublicProfile publicProfile) {
         this(
                 userId,
                 username,
                 passwordHash,
-                new PublicProfile(
-                        displayName, bio, contactInfo, weekendStyle, interestedCommunityIds),
+                publicProfile,
                 PrivateProfile.defaultUnverified(),
                 LlmPersona.empty());
     }
@@ -237,10 +229,19 @@ public final class User {
     }
 
     /**
-     * Returns whether this user has verified UofT student status (safe to display on peer cards
-     * without revealing the underlying UTORid).
+     * Returns whether this user has recorded a non-empty UTORid on their self-only profile.
      *
-     * @return {@code true} if verified UofT student
+     * @return {@code true} if a UTORid has been entered
+     */
+    public boolean hasUtorid() {
+        return privateProfile.hasUtorid();
+    }
+
+    /**
+     * Returns whether this user's UofT student status has been confirmed by a trusted verification
+     * workflow (safe to display on peer cards without revealing the underlying UTORid).
+     *
+     * @return {@code true} only if verified
      */
     public boolean isUoftVerified() {
         return privateProfile.isUoftVerified();

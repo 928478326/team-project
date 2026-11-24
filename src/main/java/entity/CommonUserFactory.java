@@ -10,15 +10,13 @@ public final class CommonUserFactory implements UserFactory {
 
     @Override
     public User create(String userId, String username, String passwordHash) {
-        String normalizedUsername = User.normalizeUsername(username);
-        return new User(
-                userId,
-                normalizedUsername,
-                passwordHash,
+        final String normalizedUsername = User.normalizeUsername(username);
+        final PublicProfile initialProfile = new PublicProfile(
                 normalizedUsername,
                 "",
                 "",
                 WeekendStyle.INDOOR_CHILL,
                 Collections.emptySet());
+        return new User(userId, normalizedUsername, passwordHash, initialProfile);
     }
 }
