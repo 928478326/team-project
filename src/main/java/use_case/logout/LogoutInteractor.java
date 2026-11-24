@@ -18,7 +18,6 @@ public final class LogoutInteractor implements LogoutInputBoundary {
 
     @Override
     public void execute(LogoutInputData inputData) {
-        // TODO [Track A]: Pass the logged-out username via LogoutOutputData to outputBoundary.
         outputBoundary.prepareSuccessView(new LogoutOutputData(inputData.getUsername()));
     }
 }

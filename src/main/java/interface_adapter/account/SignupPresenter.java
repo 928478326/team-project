@@ -32,8 +32,6 @@ public final class SignupPresenter implements SignupOutputBoundary {
 
     @Override
     public void prepareSuccessView(SignupOutputData outputData) {
-        // TODO [Track A]: Update AccountState, set logged-in SessionState, fire property changes,
-        // and switch ViewManagerModel to MAIN_SHELL_VIEW (or login tab if requiring explicit login).
         AccountState state = accountViewModel.getState();
         state.setErrorMessage("");
         state.setStatusMessage("Registered as " + outputData.getUsername());

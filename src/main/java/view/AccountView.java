@@ -12,6 +12,7 @@ import java.awt.Insets;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -34,6 +35,8 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
     private final JTextField signupUsernameField = new JTextField(18);
     private final JPasswordField signupPasswordField = new JPasswordField(18);
     private final JPasswordField signupConfirmField = new JPasswordField(18);
+    private final JButton loginButton = new JButton("Log In");
+    private final JButton signupButton = new JButton("Create Account");
     private final JLabel feedbackLabel = new JLabel(" ");
 
     private LoginController loginController;
@@ -88,13 +91,12 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         gbc.gridx = 1;
         panel.add(loginPasswordField, gbc);
 
-        JButton loginButton = new JButton("Log In");
         loginButton.addActionListener(
                 e -> {
                     if (loginController != null) {
-                        loginController.execute(
-                                loginUsernameField.getText(),
-                                new String(loginPasswordField.getPassword()));
+                        String username = loginUsernameField.getText();
+                        String password = new String(loginPasswordField.getPassword());
+                        submit(() -> loginController.execute(username, password));
                     }
                 });
         gbc.gridx = 1;
@@ -127,20 +129,33 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         gbc.gridx = 1;
         panel.add(signupConfirmField, gbc);
 
-        JButton signupButton = new JButton("Create Account");
         signupButton.addActionListener(
                 e -> {
                     if (signupController != null) {
-                        signupController.execute(
-                                signupUsernameField.getText(),
-                                new String(signupPasswordField.getPassword()),
-                                new String(signupConfirmField.getPassword()));
+                        String username = signupUsernameField.getText();
+                        String password = new String(signupPasswordField.getPassword());
+                        String confirmation = new String(signupConfirmField.getPassword());
+                        submit(() -> signupController.execute(username, password, confirmation));
                     }
                 });
         gbc.gridx = 1;
         gbc.gridy = 3;
         panel.add(signupButton, gbc);
         return panel;
+    }
+
+    private void submit(Runnable request) {
+        loginButton.setEnabled(false);
+        signupButton.setEnabled(false);
+        CompletableFuture.runAsync(request).whenComplete((unused, error) ->
+                SwingUtilities.invokeLater(() -> {
+                    loginButton.setEnabled(true);
+                    signupButton.setEnabled(true);
+                    if (error != null) {
+                        feedbackLabel.setForeground(Color.RED);
+                        feedbackLabel.setText("Could not complete the request. Please try again.");
+                    }
+                }));
     }
 
     @Override
@@ -151,16 +166,16 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         AccountState state = (AccountState) evt.getNewValue();
         Runnable updateTask =
                 () -> {
-                    // TODO [Track A]: Polish AccountView feedback and clear password fields on success.
                     if (!state.getErrorMessage().isBlank()) {
                         feedbackLabel.setForeground(Color.RED);
                         feedbackLabel.setText(state.getErrorMessage());
-                    } else if (!state.getStatusMessage().isBlank()) {
-                        feedbackLabel.setForeground(new Color(0, 120, 0));
-                        feedbackLabel.setText(state.getStatusMessage());
-                    } else {
-                        feedbackLabel.setText(" ");
+                        return;
                     }
+                    loginPasswordField.setText("");
+                    signupPasswordField.setText("");
+                    signupConfirmField.setText("");
+                    feedbackLabel.setForeground(new Color(0, 120, 0));
+                    feedbackLabel.setText(state.getStatusMessage().isEmpty() ? " " : state.getStatusMessage());
                 };
         if (SwingUtilities.isEventDispatchThread()) {
             updateTask.run();

@@ -21,7 +21,6 @@ public final class InMemoryUserDataAccess
         this.store = Objects.requireNonNull(store, "store must not be null");
     }
 
-    @Override
     public boolean existsByUsername(String normalizedUsername) {
         synchronized (store) {
             return store.userIdByUsername().containsKey(normalizedUsername);
@@ -29,9 +28,13 @@ public final class InMemoryUserDataAccess
     }
 
     @Override
-    public void saveUser(User user) {
+    public boolean saveUser(User user) {
         synchronized (store) {
+            if (existsByUsername(user.getUsername())) {
+                return false;
+            }
             store.putUser(user);
+            return true;
         }
     }
 

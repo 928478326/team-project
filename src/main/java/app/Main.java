@@ -9,9 +9,9 @@ import javax.swing.SwingUtilities;
  *
  * <p>Supported optional CLI flags for independent parallel development:
  * <ul>
- *   <li>{@code --sqlite} — use {@link SqliteDataAccessBundle} (default until Track A merges SQLite
- *       is {@link InMemoryDataAccessBundle}; flip default after SQLite integration)</li>
- *   <li>{@code --dev-user=<username>} — sign in immediately as a seeded demo user
+ *   <li>{@code --sqlite} — persist accounts between launches. The default remains the seeded
+ *       in-memory store for feature development.</li>
+ *   <li>{@code --dev-user=<username>} — in memory only, sign in immediately as a seeded demo user
  *       (e.g., {@code --dev-user=henry}, {@code james}, {@code herry}, {@code gracie}) so Tracks
  *       B/C/D can preview their Swing tabs before Login/Signup is implemented</li>
  * </ul>
@@ -42,7 +42,7 @@ public final class Main {
                 useSqlite
                         ? new SqliteDataAccessBundle(DEFAULT_SQLITE_PATH)
                         : new InMemoryDataAccessBundle();
-        final String preAuthUser = devUser;
+        final String preAuthUser = useSqlite ? null : devUser;
 
         SwingUtilities.invokeLater(
                 () -> {

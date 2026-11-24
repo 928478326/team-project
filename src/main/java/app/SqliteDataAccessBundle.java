@@ -5,7 +5,7 @@ import data_access.gateway.IcsCalendarExporter;
 import data_access.gateway.LocalUoftCourseCatalogGateway;
 import data_access.gateway.NagerPublicHolidayGateway;
 import data_access.gateway.RuleBasedExplanationFallback;
-import data_access.in_memory.Sha256PasswordHasher;
+import data_access.sqlite.Pbkdf2PasswordHasher;
 import data_access.sqlite.SqliteDatabase;
 import data_access.sqlite.SqliteEventDataAccess;
 import data_access.sqlite.SqliteRatingDataAccess;
@@ -31,12 +31,11 @@ import use_case.view_calendar.ViewCalendarDataAccessInterface;
 import use_case.view_rateable_buddies.ViewRateableBuddiesDataAccessInterface;
 
 /**
- * Production SQLite {@link DataAccessBundle}.
- * Activated once Track A completes {@link SqliteDatabase} and the {@code Sqlite*DataAccess} classes.
+ * SQLite wiring for the persistent account MVP. Feature DAOs share the database handle.
  */
 public final class SqliteDataAccessBundle implements DataAccessBundle {
 
-    private final PasswordHasher passwordHasher = new Sha256PasswordHasher();
+    private final PasswordHasher passwordHasher = new Pbkdf2PasswordHasher();
     private final SqliteUserDataAccess userDao;
     private final SqliteEventDataAccess eventDao;
     private final SqliteScheduleDataAccess scheduleDao;
@@ -52,7 +51,6 @@ public final class SqliteDataAccessBundle implements DataAccessBundle {
     public SqliteDataAccessBundle(String dbFilePath) {
         SqliteDatabase database = new SqliteDatabase(dbFilePath);
         database.initializeSchema();
-        database.seedDemoDataIfEmpty(passwordHasher);
 
         this.userDao = new SqliteUserDataAccess(database);
         this.eventDao = new SqliteEventDataAccess(database);

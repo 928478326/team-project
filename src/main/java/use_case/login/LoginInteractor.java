@@ -1,7 +1,9 @@
 package use_case.login;
 
 import entity.PasswordHasher;
+import entity.User;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Interactor implementing the Login use case.
@@ -27,12 +29,25 @@ public final class LoginInteractor implements LoginInputBoundary {
 
     @Override
     public void execute(LoginInputData inputData) {
-        // TODO [Track A]:
-        // 1. Validate non-blank username and password.
-        // 2. Normalize username via User.normalizeUsername(...) and call findByUsername(...).
-        // 3. Verify password via user.matchesPasswordHash(passwordHasher.hash(password)).
-        // 4. On success call outputBoundary.prepareSuccessView(new LoginOutputData(...));
-        //    otherwise call outputBoundary.prepareFailView(...).
-        outputBoundary.prepareFailView("TODO [Track A]: Implement LoginInteractor.execute");
+        if (inputData.getUsername().isBlank() || inputData.getPassword().isBlank()) {
+            outputBoundary.prepareFailView("Enter your username and password.");
+            return;
+        }
+
+        Optional<User> account;
+        try {
+            account = dataAccess.findByUsername(User.normalizeUsername(inputData.getUsername()));
+        } catch (IllegalStateException ex) {
+            outputBoundary.prepareFailView("Could not load the account. Please try again.");
+            return;
+        }
+        if (account.isEmpty()
+                || !passwordHasher.matches(inputData.getPassword(), account.get().getPasswordHash())) {
+            outputBoundary.prepareFailView("Incorrect username or password.");
+            return;
+        }
+        User user = account.get();
+        outputBoundary.prepareSuccessView(new LoginOutputData(
+                user.getUserId(), user.getUsername(), user.getDisplayName()));
     }
 }

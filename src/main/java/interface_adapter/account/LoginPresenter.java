@@ -32,7 +32,6 @@ public final class LoginPresenter implements LoginOutputBoundary {
 
     @Override
     public void prepareSuccessView(LoginOutputData outputData) {
-        // TODO [Track A]: Refine state clearing and status messaging as needed.
         AccountState state = accountViewModel.getState();
         state.setErrorMessage("");
         state.setStatusMessage("");
