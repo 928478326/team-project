@@ -1,7 +1,5 @@
 package data_access.sqlite;
 
-import entity.User;
-import entity.WeekendStyle;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -10,7 +8,11 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+
 import org.json.JSONArray;
+
+import entity.User;
+import entity.WeekendStyle;
 import use_case.edit_profile.EditProfileDataAccessInterface;
 import use_case.login.LoginDataAccessInterface;
 import use_case.signup.SignupDataAccessInterface;
@@ -26,7 +28,7 @@ public final class SqliteUserDataAccess
 
     @Override
     public boolean saveUser(User user) {
-        String insert = "INSERT INTO users (user_id, username, password_hash, display_name, bio, "
+        final String insert = "INSERT INTO users (user_id, username, password_hash, display_name, bio, "
                 + "contact_info, weekend_style, interested_communities) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                 + "ON CONFLICT(username) DO NOTHING";
         try (Connection connection = database.openConnection();
@@ -36,7 +38,8 @@ public final class SqliteUserDataAccess
             sql.setString(3, user.getPasswordHash());
             bindProfile(sql, 4, user);
             return sql.executeUpdate() == 1;
-        } catch (SQLException ex) {
+        }
+        catch (SQLException ex) {
             throw new IllegalStateException("Could not create account.", ex);
         }
     }
@@ -59,8 +62,8 @@ public final class SqliteUserDataAccess
                 if (!row.next()) {
                     return Optional.empty();
                 }
-                JSONArray interests = new JSONArray(row.getString("interested_communities"));
-                Set<String> ids = new LinkedHashSet<>();
+                final JSONArray interests = new JSONArray(row.getString("interested_communities"));
+                final Set<String> ids = new LinkedHashSet<>();
                 for (int i = 0; i < interests.length(); i++) {
                     ids.add(interests.getString(i));
                 }
@@ -68,14 +71,15 @@ public final class SqliteUserDataAccess
                         row.getString("password_hash"), row.getString("display_name"), row.getString("bio"),
                         row.getString("contact_info"), WeekendStyle.valueOf(row.getString("weekend_style")), ids));
             }
-        } catch (SQLException ex) {
+        }
+        catch (SQLException ex) {
             throw new IllegalStateException("Could not read account.", ex);
         }
     }
 
     @Override
     public void updateUserProfile(User user) {
-        String update = "UPDATE users SET display_name=?, bio=?, contact_info=?, weekend_style=?, "
+        final String update = "UPDATE users SET display_name=?, bio=?, contact_info=?, weekend_style=?, "
                 + "interested_communities=? WHERE user_id=?";
         try (Connection connection = database.openConnection();
                 PreparedStatement sql = connection.prepareStatement(update)) {
@@ -84,7 +88,8 @@ public final class SqliteUserDataAccess
             if (sql.executeUpdate() == 0) {
                 throw new IllegalArgumentException("Unknown user ID.");
             }
-        } catch (SQLException ex) {
+        }
+        catch (SQLException ex) {
             throw new IllegalStateException("Could not update profile.", ex);
         }
     }

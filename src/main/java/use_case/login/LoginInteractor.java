@@ -1,9 +1,10 @@
 package use_case.login;
 
-import entity.PasswordHasher;
-import entity.User;
 import java.util.Objects;
 import java.util.Optional;
+
+import entity.PasswordHasher;
+import entity.User;
 
 /**
  * Interactor implementing the Login use case.
@@ -34,10 +35,11 @@ public final class LoginInteractor implements LoginInputBoundary {
             return;
         }
 
-        Optional<User> account;
+        final Optional<User> account;
         try {
             account = dataAccess.findByUsername(User.normalizeUsername(inputData.getUsername()));
-        } catch (IllegalStateException ex) {
+        }
+        catch (IllegalStateException ex) {
             outputBoundary.prepareFailView("Could not load the account. Please try again.");
             return;
         }
@@ -46,7 +48,7 @@ public final class LoginInteractor implements LoginInputBoundary {
             outputBoundary.prepareFailView("Incorrect username or password.");
             return;
         }
-        User user = account.get();
+        final User user = account.get();
         outputBoundary.prepareSuccessView(new LoginOutputData(
                 user.getUserId(), user.getUsername(), user.getDisplayName()));
     }

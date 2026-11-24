@@ -1,6 +1,5 @@
 package data_access.sqlite;
 
-import entity.PasswordHasher;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +8,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
+
+import entity.PasswordHasher;
 
 /**
  * SQLite connection factory and schema initializer for CampusBuddy.
@@ -42,18 +43,22 @@ public final class SqliteDatabase {
      * @throws SQLException if connecting fails
      */
     public Connection openConnection() throws SQLException {
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file);
+        final Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file);
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("PRAGMA foreign_keys = ON;");
             stmt.execute("PRAGMA busy_timeout = 5000;");
-        } catch (SQLException ex) {
+        }
+        catch (SQLException ex) {
             connection.close();
             throw ex;
         }
         return connection;
     }
 
-    /** Initializes the account table on first launch and preserves existing accounts on restart. */
+    /**
+     * Initializes the account table on first launch and preserves existing accounts on restart.
+     * @throws IllegalStateException if the directory or table cannot be created
+     */
     public void initializeSchema() {
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
@@ -64,7 +69,8 @@ public final class SqliteDatabase {
                         + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
                         + "interested_communities TEXT NOT NULL)");
             }
-        } catch (IOException | SQLException ex) {
+        }
+        catch (IOException | SQLException ex) {
             throw new IllegalStateException("Could not initialize the account database.", ex);
         }
     }

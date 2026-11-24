@@ -1,9 +1,5 @@
 package view;
 
-import interface_adapter.account.AccountState;
-import interface_adapter.account.AccountViewModel;
-import interface_adapter.account.LoginController;
-import interface_adapter.account.SignupController;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.GridBagConstraints;
@@ -13,6 +9,7 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -21,6 +18,11 @@ import javax.swing.JPasswordField;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+
+import interface_adapter.account.AccountState;
+import interface_adapter.account.AccountViewModel;
+import interface_adapter.account.LoginController;
+import interface_adapter.account.SignupController;
 
 /**
  * Login &amp; Registration Swing view.
@@ -49,10 +51,10 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         setLayout(new BorderLayout(12, 12));
         setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
 
-        JLabel title = new JLabel("CampusBuddy — UofT Student Buddy Finder", JLabel.CENTER);
+        final JLabel title = new JLabel("CampusBuddy — UofT Student Buddy Finder", JLabel.CENTER);
         add(title, BorderLayout.NORTH);
 
-        JTabbedPane tabs = new JTabbedPane();
+        final JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Login", buildLoginPanel());
         tabs.addTab("Sign Up", buildSignupPanel());
         add(tabs, BorderLayout.CENTER);
@@ -74,8 +76,8 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
     }
 
     private JPanel buildLoginPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
+        final JPanel panel = new JPanel(new GridBagLayout());
+        final GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(6, 6, 6, 6);
         gbc.anchor = GridBagConstraints.WEST;
 
@@ -94,8 +96,8 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         loginButton.addActionListener(
                 e -> {
                     if (loginController != null) {
-                        String username = loginUsernameField.getText();
-                        String password = new String(loginPasswordField.getPassword());
+                        final String username = loginUsernameField.getText();
+                        final String password = new String(loginPasswordField.getPassword());
                         submit(() -> loginController.execute(username, password));
                     }
                 });
@@ -106,8 +108,8 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
     }
 
     private JPanel buildSignupPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
+        final JPanel panel = new JPanel(new GridBagLayout());
+        final GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(6, 6, 6, 6);
         gbc.anchor = GridBagConstraints.WEST;
 
@@ -132,9 +134,9 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         signupButton.addActionListener(
                 e -> {
                     if (signupController != null) {
-                        String username = signupUsernameField.getText();
-                        String password = new String(signupPasswordField.getPassword());
-                        String confirmation = new String(signupConfirmField.getPassword());
+                        final String username = signupUsernameField.getText();
+                        final String password = new String(signupPasswordField.getPassword());
+                        final String confirmation = new String(signupConfirmField.getPassword());
                         submit(() -> signupController.execute(username, password, confirmation));
                     }
                 });
@@ -147,15 +149,16 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
     private void submit(Runnable request) {
         loginButton.setEnabled(false);
         signupButton.setEnabled(false);
-        CompletableFuture.runAsync(request).whenComplete((unused, error) ->
-                SwingUtilities.invokeLater(() -> {
-                    loginButton.setEnabled(true);
-                    signupButton.setEnabled(true);
-                    if (error != null) {
-                        feedbackLabel.setForeground(Color.RED);
-                        feedbackLabel.setText("Could not complete the request. Please try again.");
-                    }
-                }));
+        CompletableFuture.runAsync(request).whenComplete((unused, error) -> {
+            SwingUtilities.invokeLater(() -> {
+                loginButton.setEnabled(true);
+                signupButton.setEnabled(true);
+                if (error != null) {
+                    feedbackLabel.setForeground(Color.RED);
+                    feedbackLabel.setText("Could not complete the request. Please try again.");
+                }
+            });
+        });
     }
 
     @Override
@@ -163,24 +166,25 @@ public final class AccountView extends JPanel implements PropertyChangeListener 
         if (!AccountViewModel.STATE_PROPERTY.equals(evt.getPropertyName())) {
             return;
         }
-        AccountState state = (AccountState) evt.getNewValue();
-        Runnable updateTask =
-                () -> {
-                    if (!state.getErrorMessage().isBlank()) {
-                        feedbackLabel.setForeground(Color.RED);
-                        feedbackLabel.setText(state.getErrorMessage());
-                        return;
-                    }
-                    loginPasswordField.setText("");
-                    signupPasswordField.setText("");
-                    signupConfirmField.setText("");
-                    feedbackLabel.setForeground(new Color(0, 120, 0));
-                    feedbackLabel.setText(state.getStatusMessage().isEmpty() ? " " : state.getStatusMessage());
-                };
+        final AccountState state = (AccountState) evt.getNewValue();
+        final Runnable updateTask = () -> showFeedback(state);
         if (SwingUtilities.isEventDispatchThread()) {
             updateTask.run();
         } else {
             SwingUtilities.invokeLater(updateTask);
         }
+    }
+
+    private void showFeedback(AccountState state) {
+        if (!state.getErrorMessage().isBlank()) {
+            feedbackLabel.setForeground(Color.RED);
+            feedbackLabel.setText(state.getErrorMessage());
+            return;
+        }
+        loginPasswordField.setText("");
+        signupPasswordField.setText("");
+        signupConfirmField.setText("");
+        feedbackLabel.setForeground(new Color(0, 120, 0));
+        feedbackLabel.setText(state.getStatusMessage().isEmpty() ? " " : state.getStatusMessage());
     }
 }

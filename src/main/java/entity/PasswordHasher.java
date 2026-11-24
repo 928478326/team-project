@@ -14,7 +14,12 @@ public interface PasswordHasher {
      */
     String hash(String rawPassword);
 
-    /** Verifies a password against the encoding produced by this hasher. */
+    /**
+     * Verifies a password against the encoding produced by this hasher.
+     * @param rawPassword password entered at login
+     * @param encoded stored credential
+     * @return whether the supplied password matches
+     */
     default boolean matches(String rawPassword, String encoded) {
         return hash(rawPassword).equals(encoded);
     }

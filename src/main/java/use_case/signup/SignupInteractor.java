@@ -1,10 +1,11 @@
 package use_case.signup;
 
+import java.util.Objects;
+import java.util.UUID;
+
 import entity.PasswordHasher;
 import entity.User;
 import entity.UserFactory;
-import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Interactor implementing the Signup use case.
@@ -36,7 +37,7 @@ public final class SignupInteractor implements SignupInputBoundary {
 
     @Override
     public void execute(SignupInputData inputData) {
-        String password = inputData.getPassword();
+        final String password = inputData.getPassword();
         if (inputData.getUsername().isBlank()) {
             outputBoundary.prepareFailView("Enter a username.");
             return;
@@ -50,19 +51,21 @@ public final class SignupInteractor implements SignupInputBoundary {
             return;
         }
 
-        User user = userFactory.create(UUID.randomUUID().toString(),
+        final User user = userFactory.create(UUID.randomUUID().toString(),
                 User.normalizeUsername(inputData.getUsername()), passwordHasher.hash(password));
-        boolean created;
+        final boolean created;
         try {
             created = dataAccess.saveUser(user);
-        } catch (IllegalStateException ex) {
+        }
+        catch (IllegalStateException ex) {
             outputBoundary.prepareFailView("Could not save the account. Please try again.");
             return;
         }
         if (created) {
             outputBoundary.prepareSuccessView(new SignupOutputData(
                     user.getUserId(), user.getUsername(), user.getDisplayName()));
-        } else {
+        }
+        else {
             outputBoundary.prepareFailView("That username is already taken.");
         }
     }

@@ -1,8 +1,9 @@
 package data_access.in_memory;
 
-import entity.User;
 import java.util.Objects;
 import java.util.Optional;
+
+import entity.User;
 import use_case.edit_profile.EditProfileDataAccessInterface;
 import use_case.login.LoginDataAccessInterface;
 import use_case.signup.SignupDataAccessInterface;
@@ -21,6 +22,11 @@ public final class InMemoryUserDataAccess
         this.store = Objects.requireNonNull(store, "store must not be null");
     }
 
+    /**
+     * Checks whether this store contains the given username.
+     * @param normalizedUsername normalized login name
+     * @return whether the username is in use
+     */
     public boolean existsByUsername(String normalizedUsername) {
         synchronized (store) {
             return store.userIdByUsername().containsKey(normalizedUsername);
@@ -33,6 +39,9 @@ public final class InMemoryUserDataAccess
             if (existsByUsername(user.getUsername())) {
                 return false;
             }
+            if (store.usersById().containsKey(user.getUserId())) {
+                throw new IllegalStateException("User ID is already in use.");
+            }
             store.putUser(user);
             return true;
         }
@@ -41,7 +50,7 @@ public final class InMemoryUserDataAccess
     @Override
     public Optional<User> findByUsername(String normalizedUsername) {
         synchronized (store) {
-            String userId = store.userIdByUsername().get(normalizedUsername);
+            final String userId = store.userIdByUsername().get(normalizedUsername);
             if (userId == null) {
                 return Optional.empty();
             }
