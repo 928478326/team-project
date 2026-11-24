@@ -13,12 +13,28 @@ public final class BrowseEventsOutputData {
 
     private final String selectedCommunityId;
     private final List<EventItem> events;
+    private final List<CommunityOption> communities;
 
     public BrowseEventsOutputData(String selectedCommunityId, List<EventItem> events) {
+        this(selectedCommunityId, events, Collections.emptyList());
+    }
+
+    /**
+     * Creates the output with the communities the user can filter by or post to.
+     *
+     * @param selectedCommunityId the filter that was applied ({@code ALL} or a community ID)
+     * @param events ordered event rows
+     * @param communities every community, in display order
+     */
+    public BrowseEventsOutputData(
+            String selectedCommunityId, List<EventItem> events, List<CommunityOption> communities) {
         this.selectedCommunityId = selectedCommunityId;
         this.events = events == null
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(events));
+        this.communities = communities == null
+                ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(communities));
     }
 
     public String getSelectedCommunityId() {
@@ -27,6 +43,32 @@ public final class BrowseEventsOutputData {
 
     public List<EventItem> getEvents() {
         return events;
+    }
+
+    public List<CommunityOption> getCommunities() {
+        return communities;
+    }
+
+    /**
+     * Immutable DTO naming one community, so outer layers never need the {@code Community} entity.
+     */
+    public static final class CommunityOption {
+
+        private final String communityId;
+        private final String name;
+
+        public CommunityOption(String communityId, String name) {
+            this.communityId = communityId;
+            this.name = name;
+        }
+
+        public String getCommunityId() {
+            return communityId;
+        }
+
+        public String getName() {
+            return name;
+        }
     }
 
     /**

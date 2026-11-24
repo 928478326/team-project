@@ -13,6 +13,7 @@ public final class CommunityEventsState {
 
     private String selectedCommunityId = "ALL";
     private List<EventRow> events = Collections.emptyList();
+    private List<CommunityOption> communities = Collections.emptyList();
     private String statusMessage = "";
     private String errorMessage = "";
     private boolean clearCreateForm;
@@ -33,6 +34,16 @@ public final class CommunityEventsState {
         this.events = events == null
                 ? Collections.emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(events));
+    }
+
+    public List<CommunityOption> getCommunities() {
+        return communities;
+    }
+
+    public void setCommunities(List<CommunityOption> communities) {
+        this.communities = communities == null
+                ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(communities));
     }
 
     public String getStatusMessage() {
@@ -57,6 +68,34 @@ public final class CommunityEventsState {
 
     public void setClearCreateForm(boolean clearCreateForm) {
         this.clearCreateForm = clearCreateForm;
+    }
+
+    /**
+     * One community choice for the filter and create-event drop-downs.
+     */
+    public static final class CommunityOption {
+
+        private final String communityId;
+        private final String name;
+
+        public CommunityOption(String communityId, String name) {
+            this.communityId = communityId;
+            this.name = name;
+        }
+
+        public String getCommunityId() {
+            return communityId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        /** Shown by Swing combo boxes. */
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 
     /**
