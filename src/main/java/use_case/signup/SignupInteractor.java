@@ -1,8 +1,11 @@
 package use_case.signup;
 
-import entity.PasswordHasher;
-import entity.UserFactory;
 import java.util.Objects;
+import java.util.UUID;
+
+import entity.PasswordHasher;
+import entity.User;
+import entity.UserFactory;
 
 /**
  * Interactor implementing the Signup use case.
@@ -34,13 +37,39 @@ public final class SignupInteractor implements SignupInputBoundary {
 
     @Override
     public void execute(SignupInputData inputData) {
-        // TODO [Track A]:
-        // 1. Validate username non-blank, password length >= MIN_PASSWORD_LENGTH,
-        //    and password equals confirmPassword.
-        // 2. Normalize username via User.normalizeUsername(...) and check existsByUsername(...).
-        // 3. Generate UUID userId, hash password via passwordHasher.hash(...),
-        //    build User via userFactory.create(...), save via dataAccess.saveUser(...).
-        // 4. Call outputBoundary.prepareSuccessView(new SignupOutputData(...)).
-        outputBoundary.prepareFailView("TODO [Track A]: Implement SignupInteractor.execute");
+        final String password = inputData.getPassword();
+        if (inputData.getUsername().isBlank()) {
+            outputBoundary.prepareFailView("Enter a username.");
+        }
+        else if (password.isBlank() || password.length() < MIN_PASSWORD_LENGTH) {
+            outputBoundary.prepareFailView("Enter a password of at least " + MIN_PASSWORD_LENGTH + " characters.");
+        }
+        else if (!password.equals(inputData.getConfirmPassword())) {
+            outputBoundary.prepareFailView("The passwords do not match.");
+        }
+        else {
+            createAccount(inputData.getUsername(), password);
+        }
+    }
+
+    private void createAccount(String username, String password) {
+        final User user = userFactory.create(UUID.randomUUID().toString(),
+                User.normalizeUsername(username), passwordHasher.hash(password));
+        String failure = "";
+        try {
+            if (!dataAccess.saveUser(user)) {
+                failure = "That username is already taken.";
+            }
+        }
+        catch (IllegalStateException ex) {
+            failure = "Could not save the account. Please try again.";
+        }
+        if (failure.isEmpty()) {
+            outputBoundary.prepareSuccessView(new SignupOutputData(
+                    user.getUserId(), user.getUsername(), user.getDisplayName()));
+        }
+        else {
+            outputBoundary.prepareFailView(failure);
+        }
     }
 }

@@ -1,14 +1,18 @@
 package data_access.sqlite;
 
-import entity.PasswordHasher;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
 
+import entity.PasswordHasher;
+
 /**
- * SQLite database connection factory, schema initializer (6 tables), and demo data seeder.
+ * SQLite connection factory and schema initializer for CampusBuddy.
  *
  * <p><b>Owner: Track A (Data Platform &amp; Auth Lead)</b>
  *
@@ -20,7 +24,7 @@ import java.util.Objects;
  */
 public final class SqliteDatabase {
 
-    private final String jdbcUrl;
+    private final Path file;
 
     /**
      * Creates a database handle pointing at a file path (e.g., {@code data/campusbuddy.db}).
@@ -29,7 +33,7 @@ public final class SqliteDatabase {
      */
     public SqliteDatabase(String dbFilePath) {
         Objects.requireNonNull(dbFilePath, "dbFilePath must not be null");
-        this.jdbcUrl = "jdbc:sqlite:" + dbFilePath;
+        this.file = Path.of(dbFilePath);
     }
 
     /**
@@ -39,29 +43,43 @@ public final class SqliteDatabase {
      * @throws SQLException if connecting fails
      */
     public Connection openConnection() throws SQLException {
-        Connection connection = DriverManager.getConnection(jdbcUrl);
+        final Connection connection = DriverManager.getConnection("jdbc:sqlite:" + file);
         try (Statement stmt = connection.createStatement()) {
             stmt.execute("PRAGMA foreign_keys = ON;");
             stmt.execute("PRAGMA busy_timeout = 5000;");
+        }
+        catch (SQLException ex) {
+            connection.close();
+            throw ex;
         }
         return connection;
     }
 
     /**
-     * Creates all 6 tables ({@code users}, {@code communities}, {@code events},
-     * {@code participations}, {@code course_enrollments}, {@code buddy_ratings})
-     * and inserts the 5 default communities idempotently.
+     * Initializes the account table on first launch and preserves existing accounts on restart.
+     * @throws IllegalStateException if the directory or table cannot be created
      */
     public void initializeSchema() {
-        // TODO [Track A]: Execute CREATE TABLE IF NOT EXISTS for all 6 tables and
-        // INSERT OR IGNORE the 5 default communities (study, sports, gaming, food, chill).
-        throw new UnsupportedOperationException("TODO [Track A]: Implement SqliteDatabase.initializeSchema");
+        try {
+            Files.createDirectories(file.toAbsolutePath().getParent());
+            try (Connection connection = openConnection(); Statement sql = connection.createStatement()) {
+                sql.execute("CREATE TABLE IF NOT EXISTS users ("
+                        + "user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
+                        + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
+                        + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
+                        + "interested_communities TEXT NOT NULL)");
+            }
+        }
+        catch (IOException | SQLException ex) {
+            throw new IllegalStateException("Could not initialize the account database.", ex);
+        }
     }
 
     /**
      * Seeds the 5 demo student accounts and initial demo data when the {@code users} table is empty.
      *
      * @param passwordHasher password hasher for demo account passwords
+     * @throws UnsupportedOperationException until the demo fixtures are implemented
      */
     public void seedDemoDataIfEmpty(PasswordHasher passwordHasher) {
         // TODO [Track A]: If SELECT COUNT(*) FROM users == 0, insert demo accounts

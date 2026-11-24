@@ -1,8 +1,9 @@
 package data_access.in_memory;
 
-import entity.User;
 import java.util.Objects;
 import java.util.Optional;
+
+import entity.User;
 import use_case.edit_profile.EditProfileDataAccessInterface;
 import use_case.login.LoginDataAccessInterface;
 import use_case.signup.SignupDataAccessInterface;
@@ -21,7 +22,11 @@ public final class InMemoryUserDataAccess
         this.store = Objects.requireNonNull(store, "store must not be null");
     }
 
-    @Override
+    /**
+     * Checks whether this store contains the given username.
+     * @param normalizedUsername normalized login name
+     * @return whether the username is in use
+     */
     public boolean existsByUsername(String normalizedUsername) {
         synchronized (store) {
             return store.userIdByUsername().containsKey(normalizedUsername);
@@ -29,20 +34,24 @@ public final class InMemoryUserDataAccess
     }
 
     @Override
-    public void saveUser(User user) {
+    public boolean saveUser(User user) {
         synchronized (store) {
-            store.putUser(user);
+            final boolean available = !existsByUsername(user.getUsername());
+            if (available) {
+                if (store.usersById().containsKey(user.getUserId())) {
+                    throw new IllegalStateException("User ID is already in use.");
+                }
+                store.putUser(user);
+            }
+            return available;
         }
     }
 
     @Override
     public Optional<User> findByUsername(String normalizedUsername) {
         synchronized (store) {
-            String userId = store.userIdByUsername().get(normalizedUsername);
-            if (userId == null) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(store.usersById().get(userId));
+            final String userId = store.userIdByUsername().get(normalizedUsername);
+            return Optional.ofNullable(userId).map(store.usersById()::get);
         }
     }
 

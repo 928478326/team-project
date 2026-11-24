@@ -8,17 +8,11 @@ import entity.User;
 public interface SignupDataAccessInterface {
 
     /**
-     * Checks whether a user with the normalized username already exists.
-     *
-     * @param normalizedUsername canonical lowercase username
-     * @return {@code true} if taken
-     */
-    boolean existsByUsername(String normalizedUsername);
-
-    /**
      * Persists a newly created {@link User}.
      *
      * @param user newly constructed user entity
+     * @return true if inserted, false if the username was already taken
+     * @throws IllegalStateException if storage fails
      */
-    void saveUser(User user);
+    boolean saveUser(User user);
 }
