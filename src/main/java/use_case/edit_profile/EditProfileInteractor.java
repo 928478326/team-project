@@ -57,9 +57,16 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
             outputBoundary.prepareFailView("User ID must not be blank.");
         }
         else {
-            final Optional<User> existing = dataAccess.findUserById(inputData.getUserId());
+            Optional<User> existing = Optional.empty();
+            String loadFailure = "User not found: " + inputData.getUserId();
+            try {
+                existing = dataAccess.findUserById(inputData.getUserId());
+            }
+            catch (IllegalStateException ex) {
+                loadFailure = "Could not load the profile. Please try again.";
+            }
             if (existing.isEmpty()) {
-                outputBoundary.prepareFailView("User not found: " + inputData.getUserId());
+                outputBoundary.prepareFailView(loadFailure);
             }
             else if (inputData.getAction() == EditProfileInputData.Action.LOAD) {
                 outputBoundary.prepareSuccessView(
@@ -72,6 +79,7 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
     }
 
     private void handleSave(User currentUser, EditProfileInputData inputData) {
+        EditProfileOutputData savedProfile = null;
         try {
             final WeekendStyle weekendStyle = WeekendStyle.of(inputData.getWeekendStyleCode());
             final PublicProfile updatedPublic = PublicProfile.createValidated(
@@ -88,10 +96,16 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
             final User finalUser = withVisibleEdits.withLlmPersona(enrichedPersona);
 
             dataAccess.updateUserProfile(finalUser);
-            outputBoundary.prepareSuccessView(toOutputData(finalUser, "Profile saved."));
+            savedProfile = toOutputData(finalUser, "Profile saved.");
         }
         catch (IllegalArgumentException ex) {
             outputBoundary.prepareFailView(ex.getMessage());
+        }
+        catch (IllegalStateException ex) {
+            outputBoundary.prepareFailView("Could not save the profile. Please try again.");
+        }
+        if (savedProfile != null) {
+            outputBoundary.prepareSuccessView(savedProfile);
         }
     }
 

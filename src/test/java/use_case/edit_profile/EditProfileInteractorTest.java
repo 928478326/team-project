@@ -110,6 +110,48 @@ class EditProfileInteractorTest {
     }
 
     @Test
+    void testLoadReportsStorageFailure() {
+        final FakeEditProfileDataAccess fakeDao = new FakeEditProfileDataAccess();
+        fakeDao.failOnRead = true;
+        final FakeEditProfilePresenter presenter = new FakeEditProfilePresenter();
+        final EditProfileInteractor interactor = new EditProfileInteractor(fakeDao, presenter);
+
+        interactor.execute(new EditProfileInputData(
+                "u-henry", EditProfileInputData.Action.LOAD, "", "", "", "", Set.of()));
+
+        assertEquals(1, presenter.failCalls);
+        assertEquals("Could not load the profile. Please try again.", presenter.lastError);
+        assertEquals(0, presenter.successCalls);
+        assertEquals(0, fakeDao.updateCallCount);
+    }
+
+    @Test
+    void testSaveReportsStorageFailureAndCanBeRetried() {
+        final FakeEditProfileDataAccess fakeDao = new FakeEditProfileDataAccess();
+        fakeDao.seed(new User("u-henry", "henry", "hash",
+                new PublicProfile("Henry", "Original bio", "", WeekendStyle.INDOOR_CHILL, Set.of())));
+        fakeDao.failOnUpdate = true;
+        final FakeEditProfilePresenter presenter = new FakeEditProfilePresenter();
+        final EditProfileInteractor interactor = new EditProfileInteractor(fakeDao, presenter);
+        final EditProfileInputData edit = new EditProfileInputData(
+                "u-henry", EditProfileInputData.Action.SAVE, "Henry", "New bio", "", "hiking", Set.of());
+
+        interactor.execute(edit);
+
+        assertEquals(1, presenter.failCalls);
+        assertEquals("Could not save the profile. Please try again.", presenter.lastError);
+        assertEquals(0, presenter.successCalls);
+        assertEquals("Original bio", fakeDao.findUserById("u-henry").orElseThrow().getBio());
+
+        fakeDao.failOnUpdate = false;
+        interactor.execute(edit);
+
+        assertEquals(1, presenter.failCalls);
+        assertEquals(1, presenter.successCalls);
+        assertEquals("New bio", fakeDao.findUserById("u-henry").orElseThrow().getBio());
+    }
+
+    @Test
     void testSavePublicOnlyPreservesExistingPrivateProfileAndSupportsFreeTextStyle() {
         final FakeEditProfileDataAccess fakeDao = new FakeEditProfileDataAccess();
         final User original = new User(
@@ -294,6 +336,8 @@ class EditProfileInteractorTest {
 
         private final Map<String, User> users = new HashMap<>();
         private int updateCallCount;
+        private boolean failOnRead;
+        private boolean failOnUpdate;
 
         void seed(User user) {
             users.put(user.getUserId(), user);
@@ -301,12 +345,18 @@ class EditProfileInteractorTest {
 
         @Override
         public Optional<User> findUserById(String userId) {
+            if (failOnRead) {
+                throw new IllegalStateException("Could not read account.");
+            }
             return Optional.ofNullable(users.get(userId));
         }
 
         @Override
         public void updateUserProfile(User updatedUser) {
             updateCallCount++;
+            if (failOnUpdate) {
+                throw new IllegalStateException("Could not update profile.");
+            }
             users.put(updatedUser.getUserId(), updatedUser);
         }
     }
