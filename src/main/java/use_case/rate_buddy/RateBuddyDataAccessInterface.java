@@ -2,26 +2,14 @@ package use_case.rate_buddy;
 
 import entity.BuddyRating;
 
-/**
- * Narrow Data Access Interface for validating shared-event participation and upserting ratings (ISP).
- */
+/** Write boundary for post-meetup feedback. */
 public interface RateBuddyDataAccessInterface {
-
     /**
-     * Checks whether both {@code raterId} and {@code rateeId} hold participation records
-     * for {@code eventId}.
-     *
-     * @param raterId rating author user ID
-     * @param rateeId target buddy user ID
-     * @param eventId shared event ID
-     * @return {@code true} if both users participated in {@code eventId}
+     * Saves or replaces the author's rating for this buddy and event in one operation.
+     * Both students must have joined the event and it must have started by the rating timestamp.
+     * @param rating validated feedback
+     * @return whether the pair was eligible and the write succeeded
+     * @throws IllegalStateException if storage is unavailable
      */
-    boolean haveUsersSharedEvent(String raterId, String rateeId, String eventId);
-
-    /**
-     * Inserts or updates a {@link BuddyRating} keyed by {@code (raterId, rateeId, eventId)}.
-     *
-     * @param rating validated rating entity
-     */
-    void upsertRating(BuddyRating rating);
+    boolean saveIfEligible(BuddyRating rating);
 }
