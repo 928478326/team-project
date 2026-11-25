@@ -1,47 +1,18 @@
 package use_case.view_rateable_buddies;
 
-import entity.BuddyRating;
-import entity.Event;
-import entity.Participation;
-import entity.User;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-/**
- * Narrow Data Access Interface for finding buddies who shared events with the current user (ISP).
- */
+import use_case.view_rateable_buddies.ViewRateableBuddiesOutputData.RateableBuddyItem;
+
+/** Read boundary for the student's shared meetups and their own previous feedback. */
 public interface ViewRateableBuddiesDataAccessInterface {
-
     /**
-     * Returns all events joined by {@code userId}.
-     *
-     * @param userId active user ID
-     * @return joined events
+     * Lists the other participants in the student's events that started at or before the supplied time.
+     * @param userId current student
+     * @param asOf latest eligible event start, inclusive
+     * @return one item per buddy and shared event
+     * @throws IllegalStateException if storage is unavailable
      */
-    List<Event> findEventsJoinedByUser(String userId);
-
-    /**
-     * Returns all participation records for {@code eventId}.
-     *
-     * @param eventId shared event ID
-     * @return participations in that event
-     */
-    List<Participation> findParticipationsByEventId(String eventId);
-
-    /**
-     * Batch-fetches user profiles by ID.
-     *
-     * @param userIds co-participant user IDs
-     * @return map of userId to {@link User}
-     */
-    Map<String, User> findUsersByIds(Set<String> userIds);
-
-    /**
-     * Returns all existing ratings authored by {@code raterId}.
-     *
-     * @param raterId active user ID
-     * @return authored ratings
-     */
-    List<BuddyRating> findRatingsByRater(String raterId);
+    List<RateableBuddyItem> findRateableBuddies(String userId, Instant asOf);
 }

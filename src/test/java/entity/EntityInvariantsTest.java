@@ -92,11 +92,11 @@ class EntityInvariantsTest {
 
     @Test
     void testWeekendStyleUnicodeCaseFoldingMaintainsEqualsHashCodeContract() {
-        final WeekendStyle upperGreek = WeekendStyle.of("ΟΣ");
-        final WeekendStyle lowerGreek = WeekendStyle.of("οσ");
-        final WeekendStyle finalSigmaGreek = WeekendStyle.of("ος");
+        final WeekendStyle upperGreek = WeekendStyle.of("\u039f\u03a3");
+        final WeekendStyle lowerGreek = WeekendStyle.of("\u03bf\u03c3");
+        final WeekendStyle finalSigmaGreek = WeekendStyle.of("\u03bf\u03c2");
 
-        assertEquals("ΟΣ", upperGreek.getDisplayName());
+        assertEquals("\u039f\u03a3", upperGreek.getDisplayName());
         assertEquals(upperGreek, lowerGreek);
         assertEquals(upperGreek, finalSigmaGreek);
         assertEquals(upperGreek.hashCode(), lowerGreek.hashCode());

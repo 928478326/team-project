@@ -26,6 +26,31 @@ public final class User {
     private final LlmPersona llmPersona;
 
     /**
+     * Constructs an immutable {@code User} while enforcing core domain invariants.
+     *
+     * @param userId unique identifier (non-blank)
+     * @param username login handle, normalized to trimmed lowercase (non-blank)
+     * @param passwordHash hashed password (non-blank)
+     * @param displayName visible name (non-blank)
+     * @param bio optional short bio (null normalized to empty string)
+     * @param contactInfo optional contact handle such as Discord/Instagram/email
+     * @param weekendStyle preferred weekend style (non-null)
+     * @param interestedCommunityIds set of community IDs the user is interested in
+     */
+    public User(
+            String userId,
+            String username,
+            String passwordHash,
+            String displayName,
+            String bio,
+            String contactInfo,
+            WeekendStyle weekendStyle,
+            Set<String> interestedCommunityIds) {
+        this(userId, username, passwordHash,
+                new PublicProfile(displayName, bio, contactInfo, weekendStyle, interestedCommunityIds));
+    }
+
+    /**
      * Constructs an immutable {@code User} with default self-only {@link PrivateProfile}
      * and empty {@link LlmPersona}.
      *
