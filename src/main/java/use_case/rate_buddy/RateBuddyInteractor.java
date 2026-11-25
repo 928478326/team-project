@@ -3,6 +3,8 @@ package use_case.rate_buddy;
 import java.time.Clock;
 import java.util.Objects;
 
+import entity.BuddyRating;
+
 /**
  * Interactor implementing the Rate Buddy use case.
  *
@@ -26,12 +28,31 @@ public final class RateBuddyInteractor implements RateBuddyInputBoundary {
 
     @Override
     public void execute(RateBuddyInputData inputData) {
-        // TODO [Track C]:
-        // 1. Validate raterId, rateeId, eventId non-blank and !raterId.equals(rateeId).
-        // 2. Verify dataAccess.haveUsersSharedEvent(raterId, rateeId, eventId).
-        // 3. Construct BuddyRating(..., clock.instant()) (catching IllegalArgumentException
-        //    for score range / comment length -> prepareFailView).
-        // 4. Call dataAccess.upsertRating(rating) and outputBoundary.prepareSuccessView(...).
-        outputBoundary.prepareFailView("TODO [Track C]: Implement RateBuddyInteractor.execute");
+        final String error = save(inputData);
+        if (error.isEmpty()) {
+            outputBoundary.prepareSuccessView(new RateBuddyOutputData(inputData.getRateeId(),
+                    inputData.getEventId(), inputData.getScore(), inputData.isWouldMeetAgain(), "Rating saved."));
+        }
+        else {
+            outputBoundary.prepareFailView(error);
+        }
+    }
+
+    private String save(RateBuddyInputData input) {
+        String error = "";
+        try {
+            final BuddyRating rating = new BuddyRating(input.getRaterId(), input.getRateeId(), input.getEventId(),
+                    input.getScore(), input.isWouldMeetAgain(), input.getComment(), clock.instant());
+            if (!dataAccess.saveIfEligible(rating)) {
+                error = "You can only rate someone from a shared event that has started.";
+            }
+        }
+        catch (IllegalArgumentException invalidRating) {
+            error = invalidRating.getMessage();
+        }
+        catch (IllegalStateException unavailable) {
+            error = "Could not save your rating. Please try again.";
+        }
+        return error;
     }
 }

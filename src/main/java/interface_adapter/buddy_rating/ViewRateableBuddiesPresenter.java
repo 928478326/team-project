@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 import use_case.view_rateable_buddies.ViewRateableBuddiesOutputBoundary;
 import use_case.view_rateable_buddies.ViewRateableBuddiesOutputData;
 
@@ -28,9 +29,9 @@ public final class ViewRateableBuddiesPresenter implements ViewRateableBuddiesOu
 
     @Override
     public void prepareSuccessView(ViewRateableBuddiesOutputData outputData) {
-        List<BuddyRatingState.RateableBuddyRow> rows = new ArrayList<>();
-        for (ViewRateableBuddiesOutputData.RateableBuddyItem item : outputData.getItems()) {
-            String formattedTime =
+        final List<BuddyRatingState.RateableBuddyRow> rows = new ArrayList<>();
+        for (final ViewRateableBuddiesOutputData.RateableBuddyItem item : outputData.getItems()) {
+            final String formattedTime =
                     item.getEventStartsAt().atZone(displayZone).format(DISPLAY_FORMATTER);
             rows.add(
                     new BuddyRatingState.RateableBuddyRow(
@@ -44,19 +45,21 @@ public final class ViewRateableBuddiesPresenter implements ViewRateableBuddiesOu
                             item.isExistingWouldMeetAgain(),
                             item.getExistingComment()));
         }
-        BuddyRatingState state = viewModel.getState();
-        state.setItems(rows);
-        state.setErrorMessage("");
-        state.setStatusMessage(
-                rows.isEmpty() ? "Join an event with other students to rate buddies." : "");
-        viewModel.firePropertyChanged();
+        viewModel.present(BuddyRatingViewModel.ROWS_LOADED, state -> {
+            state.setItems(rows);
+            state.setErrorMessage("");
+            state.setStatusMessage("");
+            if (rows.isEmpty()) {
+                state.setStatusMessage("No buddies to rate yet. Shared events appear after they start.");
+            }
+        });
     }
 
     @Override
     public void prepareFailView(String errorMessage) {
-        BuddyRatingState state = viewModel.getState();
-        state.setStatusMessage("");
-        state.setErrorMessage(errorMessage);
-        viewModel.firePropertyChanged();
+        viewModel.present(BuddyRatingViewModel.STATE_PROPERTY, state -> {
+            state.setStatusMessage("");
+            state.setErrorMessage(errorMessage);
+        });
     }
 }

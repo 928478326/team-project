@@ -69,21 +69,55 @@ public final class SqliteDatabase {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (Connection connection = openConnection();
                     Statement sql = connection.createStatement()) {
-                sql.execute("CREATE TABLE IF NOT EXISTS users ("
-                        + "user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
-                        + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
-                        + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
-                        + "interested_communities TEXT NOT NULL, "
-                        + "utorid TEXT NOT NULL DEFAULT '', "
-                        + "share_contact_info INTEGER NOT NULL DEFAULT 1, "
-                        + "uoft_verified INTEGER NOT NULL DEFAULT 0, "
-                        + "llm_persona TEXT NOT NULL DEFAULT '')");
-                migrateUsersColumns(sql);
+                sql.execute("BEGIN IMMEDIATE");
+                try {
+                    initializeUsers(sql);
+                    createMeetupTables(sql);
+                    sql.execute("COMMIT");
+                }
+                catch (SQLException ex) {
+                    sql.execute("ROLLBACK");
+                    throw ex;
+                }
             }
         }
         catch (IOException | SQLException ex) {
-            throw new IllegalStateException("Could not initialize the account database.", ex);
+            throw new IllegalStateException("Could not initialize the CampusBuddy database.", ex);
         }
+    }
+
+    private static void initializeUsers(Statement sql) throws SQLException {
+        sql.execute("CREATE TABLE IF NOT EXISTS users ("
+                + "user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
+                + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
+                + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
+                + "interested_communities TEXT NOT NULL, "
+                + "utorid TEXT NOT NULL DEFAULT '', "
+                + "share_contact_info INTEGER NOT NULL DEFAULT 1, "
+                + "uoft_verified INTEGER NOT NULL DEFAULT 0, "
+                + "llm_persona TEXT NOT NULL DEFAULT '')");
+        migrateUsersColumns(sql);
+    }
+
+    private void createMeetupTables(Statement sql) throws SQLException {
+        sql.execute("CREATE TABLE IF NOT EXISTS communities (community_id TEXT PRIMARY KEY NOT NULL, "
+                + "name TEXT NOT NULL)");
+        sql.execute("CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY NOT NULL, "
+                + "community_id TEXT NOT NULL REFERENCES communities(community_id), "
+                + "creator_id TEXT NOT NULL REFERENCES users(user_id), title TEXT NOT NULL, "
+                + "description TEXT NOT NULL, capacity INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 100), "
+                + "starts_at_ms INTEGER NOT NULL)");
+        sql.execute("CREATE TABLE IF NOT EXISTS participations (user_id TEXT NOT NULL REFERENCES users(user_id), "
+                + "event_id TEXT NOT NULL REFERENCES events(event_id), joined_at_ms INTEGER NOT NULL, "
+                + "PRIMARY KEY (user_id, event_id))");
+        sql.execute("CREATE INDEX IF NOT EXISTS participants_by_event ON participations (event_id, user_id)");
+        sql.execute("CREATE TABLE IF NOT EXISTS buddy_ratings (rater_id TEXT NOT NULL, ratee_id TEXT NOT NULL, "
+                + "event_id TEXT NOT NULL, score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5), "
+                + "would_meet_again INTEGER NOT NULL CHECK (would_meet_again IN (0, 1)), comment TEXT NOT NULL, "
+                + "rated_at_ms INTEGER NOT NULL, PRIMARY KEY (rater_id, ratee_id, event_id), "
+                + "CHECK (rater_id <> ratee_id), "
+                + "FOREIGN KEY (rater_id, event_id) REFERENCES participations(user_id, event_id), "
+                + "FOREIGN KEY (ratee_id, event_id) REFERENCES participations(user_id, event_id))");
     }
 
     /**
