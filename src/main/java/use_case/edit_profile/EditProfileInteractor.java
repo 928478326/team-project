@@ -95,8 +95,12 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
             final LlmPersona enrichedPersona = enrichPersonaSafely(withVisibleEdits);
             final User finalUser = withVisibleEdits.withLlmPersona(enrichedPersona);
 
-            dataAccess.updateUserProfile(finalUser);
-            savedProfile = toOutputData(finalUser, "Profile saved.");
+            if (dataAccess.updateIfUnchanged(currentUser, finalUser)) {
+                savedProfile = toOutputData(finalUser, "Profile saved.");
+            }
+            else {
+                outputBoundary.prepareFailView("Your profile changed during this save. Reload it and try again.");
+            }
         }
         catch (IllegalArgumentException ex) {
             outputBoundary.prepareFailView(ex.getMessage());
@@ -127,19 +131,17 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
         LlmPersona resolved = updatedUser.getLlmPersona();
         final LlmProfileEnrichmentGateway.SanitizedProfileSnapshot snapshot =
                 new LlmProfileEnrichmentGateway.SanitizedProfileSnapshot(
-                        updatedUser.getDisplayName(),
-                        updatedUser.getBio(),
-                        updatedUser.getWeekendStyle().getDisplayName(),
-                        updatedUser.getInterestedCommunityIds(),
-                        updatedUser.getLlmPersona());
-        try {
-            final LlmPersona candidate = personaGateway.enrichPersona(snapshot);
-            if (candidate != null) {
-                resolved = candidate;
+                        updatedUser.getWeekendStyle(), updatedUser.getInterestedCommunityIds());
+        if (!snapshot.isEmpty()) {
+            try {
+                final LlmPersona candidate = personaGateway.enrichPersona(snapshot);
+                if (candidate != null) {
+                    resolved = candidate;
+                }
             }
-        }
-        catch (IllegalStateException | IllegalArgumentException ex) {
-            resolved = updatedUser.getLlmPersona();
+            catch (IllegalStateException | IllegalArgumentException ex) {
+                resolved = updatedUser.getLlmPersona();
+            }
         }
         return resolved;
     }

@@ -25,4 +25,13 @@ public interface EditProfileDataAccessInterface {
      * @throws IllegalStateException if storage cannot write the profile
      */
     void updateUserProfile(User updatedUser);
+
+    /**
+     * Atomically replaces a profile only while its persisted fields still match the loaded snapshot.
+     * @param expected account as originally loaded
+     * @param updated proposed replacement for the same account
+     * @return whether the update was applied
+     * @throws IllegalStateException if storage is unavailable
+     */
+    boolean updateIfUnchanged(User expected, User updated);
 }

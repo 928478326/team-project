@@ -63,6 +63,18 @@ public final class InMemoryUserDataAccess
     }
 
     @Override
+    public boolean updateIfUnchanged(User expected, User updated) {
+        synchronized (store) {
+            final User saved = store.usersById().get(updated.getUserId());
+            final boolean matches = saved != null && saved.hasSameProfileAs(expected);
+            if (matches) {
+                store.putUser(updated);
+            }
+            return matches;
+        }
+    }
+
+    @Override
     public void updateUserProfile(User updatedUser) {
         synchronized (store) {
             if (!store.usersById().containsKey(updatedUser.getUserId())) {

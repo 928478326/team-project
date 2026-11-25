@@ -2,79 +2,53 @@ package use_case.edit_profile;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.Objects;
 import java.util.Set;
 
+import entity.Community;
 import entity.LlmPersona;
+import entity.WeekendStyle;
 
-/**
- * Output port (Gateway interface) allowing {@link EditProfileInteractor} to request LLM enrichment
- * of a user's hidden {@link LlmPersona} whenever their public profile changes.
- *
- * <p><b>Privacy-by-Design (PII Scrubbing)</b>: This boundary accepts ONLY a
- * {@link SanitizedProfileSnapshot} stripped of Tier 2 self-only fields ({@code utorid}),
- * {@code contactInfo}, {@code username}, and {@code passwordHash}.
- */
+/** Enriches the hidden persona using only predefined preference categories. */
 public interface LlmProfileEnrichmentGateway {
 
     /**
-     * Synthesizes an updated hidden {@link LlmPersona} from a PII-scrubbed profile snapshot.
-     *
-     * @param snapshot sanitized public preference snapshot plus prior hidden persona
-     * @return updated {@link LlmPersona} (never exposed to UI layers)
-     * @throws IllegalStateException if the remote LLM service is unreachable or fails
+     * Generates a hidden summary from approved categories.
+     * @param snapshot selected weekend preset and community IDs
+     * @return generated persona, or null to keep the previous local persona
      */
     LlmPersona enrichPersona(SanitizedProfileSnapshot snapshot);
 
     /**
-     * Returns a no-op gateway implementation that preserves the user's existing {@link LlmPersona}.
-     *
-     * @return identity enrichment gateway
+     * Creates a gateway that leaves the stored summary untouched.
+     * @return no-op enrichment gateway
      */
     static LlmProfileEnrichmentGateway identity() {
-        return SanitizedProfileSnapshot::getExistingPersona;
+        return snapshot -> null;
     }
 
-    /**
-     * Immutable PII-scrubbed snapshot passed across the external LLM gateway boundary.
-     */
+    /** Immutable allowlist projection. Custom styles and unknown community IDs stay local. */
     final class SanitizedProfileSnapshot {
-
-        private final String displayName;
-        private final String bio;
         private final String weekendStyleText;
         private final Set<String> interestedCommunityIds;
-        private final LlmPersona existingPersona;
 
         /**
-         * Constructs a sanitized profile snapshot safe for external LLM consumption.
-         *
-         * @param displayName visible student nickname
-         * @param bio public short bio
-         * @param weekendStyleText free-text weekend preference description
-         * @param interestedCommunityIds normalized interested community IDs
-         * @param existingPersona previously synthesized hidden persona (non-null)
+         * Projects the selected preferences onto the application's built-in categories.
+         * @param style student's saved weekend style
+         * @param interests selected community IDs
          */
-        public SanitizedProfileSnapshot(
-                String displayName,
-                String bio,
-                String weekendStyleText,
-                Set<String> interestedCommunityIds,
-                LlmPersona existingPersona) {
-            this.displayName = emptyIfNull(displayName);
-            this.bio = emptyIfNull(bio);
-            this.weekendStyleText = emptyIfNull(weekendStyleText);
-            this.interestedCommunityIds = immutableSetCopy(interestedCommunityIds);
-            this.existingPersona =
-                    Objects.requireNonNull(existingPersona, "existingPersona must not be null");
-        }
-
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        public String getBio() {
-            return bio;
+        public SanitizedProfileSnapshot(WeekendStyle style, Set<String> interests) {
+            String preset = "";
+            if (style != null && style.isPreset()) {
+                preset = style.getDisplayName();
+            }
+            weekendStyleText = preset;
+            final Set<String> selected = new LinkedHashSet<>();
+            for (Community community : Community.defaultCommunities()) {
+                if (interests != null && interests.contains(community.getCommunityId())) {
+                    selected.add(community.getCommunityId());
+                }
+            }
+            interestedCommunityIds = Collections.unmodifiableSet(selected);
         }
 
         public String getWeekendStyleText() {
@@ -85,30 +59,8 @@ public interface LlmProfileEnrichmentGateway {
             return interestedCommunityIds;
         }
 
-        public LlmPersona getExistingPersona() {
-            return existingPersona;
-        }
-
-        private static String emptyIfNull(String value) {
-            final String result;
-            if (value == null) {
-                result = "";
-            }
-            else {
-                result = value;
-            }
-            return result;
-        }
-
-        private static Set<String> immutableSetCopy(Set<String> source) {
-            final Set<String> copy;
-            if (source == null) {
-                copy = Collections.emptySet();
-            }
-            else {
-                copy = Collections.unmodifiableSet(new LinkedHashSet<>(source));
-            }
-            return copy;
+        public boolean isEmpty() {
+            return weekendStyleText.isEmpty() && interestedCommunityIds.isEmpty();
         }
     }
 }

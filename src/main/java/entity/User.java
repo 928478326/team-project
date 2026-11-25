@@ -220,6 +220,17 @@ public final class User {
         return passwordHash;
     }
 
+    /**
+     * Checks whether the stored profile still matches the snapshot an edit started from.
+     * @param other expected account and profile
+     * @return whether every editable field and the stored persona still match
+     */
+    public boolean hasSameProfileAs(User other) {
+        return userId.equals(other.userId) && publicProfile.equals(other.publicProfile)
+                && getWeekendStyle().name().equals(other.getWeekendStyle().name())
+                && privateProfile.equals(other.privateProfile) && llmPersona.equals(other.llmPersona);
+    }
+
     public PublicProfile getPublicProfile() {
         return publicProfile;
     }
