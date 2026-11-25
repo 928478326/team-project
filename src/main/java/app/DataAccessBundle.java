@@ -4,6 +4,7 @@ import entity.PasswordHasher;
 import use_case.browse_events.BrowseEventsDataAccessInterface;
 import use_case.create_event.CreateEventDataAccessInterface;
 import use_case.edit_profile.EditProfileDataAccessInterface;
+import use_case.edit_profile.LlmProfileEnrichmentGateway;
 import use_case.edit_schedule.CourseCatalogGateway;
 import use_case.edit_schedule.EditScheduleDataAccessInterface;
 import use_case.join_event.JoinEventDataAccessInterface;
@@ -57,6 +58,12 @@ public interface DataAccessBundle {
     RateBuddyDataAccessInterface rateBuddyDataAccess();
 
     EditProfileDataAccessInterface editProfileDataAccess();
+
+    /**
+     * Supplies the gateway used to generate a hidden profile summary on save.
+     * @return the profile enrichment service
+     */
+    LlmProfileEnrichmentGateway profileEnrichmentGateway();
 
     RecommendBuddiesDataAccessInterface recommendBuddiesDataAccess();
 

@@ -16,6 +16,10 @@ public final class RecommendationState {
     private String displayName = "";
     private String bio = "";
     private String contactInfo = "";
+    private String utorid = "";
+    private boolean recordedUtorid;
+    private boolean shareContactInfo = true;
+    private boolean uoftVerified;
     private String weekendStyleCode = "INDOOR_CHILL";
     private Set<String> interestedCommunityIds = Collections.emptySet();
     private List<RecommendationCard> recommendations = Collections.emptyList();
@@ -46,6 +50,33 @@ public final class RecommendationState {
 
     public void setContactInfo(String contactInfo) {
         this.contactInfo = contactInfo == null ? "" : contactInfo;
+    }
+
+    void setPrivateStatus(String ownerUtorid, boolean recorded, boolean shared, boolean verified) {
+        utorid = ownerUtorid;
+        recordedUtorid = recorded;
+        shareContactInfo = shared;
+        uoftVerified = verified;
+    }
+
+    public String getUtorid() {
+        return utorid;
+    }
+
+    /**
+     * Indicates whether the owner has recorded a UTORid.
+     * @return true if a UTORid is present
+     */
+    public boolean hasUtorid() {
+        return recordedUtorid;
+    }
+
+    public boolean isShareContactInfo() {
+        return shareContactInfo;
+    }
+
+    public boolean isUoftVerified() {
+        return uoftVerified;
     }
 
     public String getWeekendStyleCode() {

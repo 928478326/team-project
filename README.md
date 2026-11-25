@@ -74,3 +74,9 @@ sequenceDiagram
     P-->>V: Update the view model
     V-->>Student: Show confirmation or explain the error
 ```
+
+## Track D profile enrichment
+
+Set `CAMPUSBUDDY_LLM_API_KEY` to generate a preference summary with Gemini. Requests contain the selected built-in weekend preset and recognized community IDs. Names, bios, custom weekend text, contact details, UTORids and previous summaries stay in the application.
+
+Without a key or when the service fails, the app builds the summary locally from the same categories. If no category is selected, the saved summary is preserved. SQLite stores it with the profile across launches.
