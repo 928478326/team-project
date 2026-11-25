@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import entity.LlmPersona;
+import entity.WeekendStyle;
 import okhttp3.OkHttpClient;
 import use_case.edit_profile.LlmProfileEnrichmentGateway;
 import use_case.edit_profile.LlmProfileEnrichmentGateway.SanitizedProfileSnapshot;
@@ -34,7 +35,7 @@ class ProfileEnrichmentGatewayTest {
     private final AtomicReference<String> requestBody = new AtomicReference<>();
     private final AtomicReference<String> key = new AtomicReference<>();
     private final SanitizedProfileSnapshot profile = new SanitizedProfileSnapshot(
-            "Rowan", "Quiet study groups", "Saturday walks", Set.of("study", "food"), LlmPersona.of("Old summary"));
+            WeekendStyle.STUDY_FOCUS, Set.of("study", "food", "private@example.invalid"));
     private final RuleBasedProfileEnrichmentGateway offline = new RuleBasedProfileEnrichmentGateway();
     private final OkHttpClient client = new OkHttpClient.Builder().callTimeout(2, TimeUnit.SECONDS).build();
     private HttpServer server;
@@ -74,7 +75,7 @@ class ProfileEnrichmentGatewayTest {
     }
 
     @Test
-    void sendsOnlyTheFiveSnapshotFieldsAndReadsTheCompletedAnswer() {
+    void sendsOnlyApprovedCategoriesAndReadsTheCompletedAnswer() {
         reply.set("{\"candidates\":[{\"finishReason\":\"STOP\",\"content\":{\"parts\":["
                 + "{\"thought\":true,\"text\":\"discard\"},{\"text\":\"" + GENERATED + "\"}]}}]}");
         assertEquals(GENERATED, gateway("test-key").enrichPersona(profile).getSummary());
@@ -82,12 +83,9 @@ class ProfileEnrichmentGatewayTest {
         final JSONObject envelope = new JSONObject(requestBody.get());
         final JSONObject content = envelope.getJSONArray("contents").getJSONObject(0);
         final JSONObject data = new JSONObject(content.getJSONArray("parts").getJSONObject(0).getString("text"));
-        assertEquals(Set.of("displayName", "bio", "weekendStyleText", "interestedCommunityIds", "existingPersona"),
-                data.keySet());
-        assertEquals("Rowan", data.getString("displayName"));
-        assertEquals("Quiet study groups", data.getString("bio"));
-        assertEquals("Saturday walks", data.getString("weekendStyleText"));
-        assertEquals("Old summary", data.getString("existingPersona"));
+        assertEquals(Set.of("weekendStyleText", "interestedCommunityIds"), data.keySet());
+        assertEquals("Study Focus", data.getString("weekendStyleText"));
+        assertFalse(requestBody.get().contains("private@example.invalid"));
         assertEquals(profile.getInterestedCommunityIds(), Set.copyOf(data.getJSONArray("interestedCommunityIds")
                 .toList()));
         assertFalse(requestBody.get().contains("test-key"));
@@ -97,7 +95,7 @@ class ProfileEnrichmentGatewayTest {
     void noKeyUsesDeterministicLocalPreferencesWithoutContactingServer() {
         final LlmProfileEnrichmentGateway gateway = gateway("  ");
         final LlmPersona persona = gateway.enrichPersona(profile);
-        assertEquals("Weekend preference: Saturday walks. Bio: Quiet study groups. Communities: food, study",
+        assertEquals("Weekend preference: Study Focus. Communities: food, study",
                 persona.getSummary());
         assertEquals(persona, gateway.enrichPersona(profile));
         assertEquals(0, hits.get());
@@ -125,11 +123,11 @@ class ProfileEnrichmentGatewayTest {
     }
 
     @Test
-    void largeInterestListStaysWithinTheEntityLimit() {
-        final SanitizedProfileSnapshot longInput = new SanitizedProfileSnapshot("Rowan", "", "walks",
-                Set.of("s".repeat(LlmPersona.MAX_SUMMARY_LENGTH)), LlmPersona.empty());
-        final String summary = offline.enrichPersona(longInput).getSummary();
-        assertEquals(LlmPersona.MAX_SUMMARY_LENGTH, summary.length());
-        assertTrue(summary.startsWith("Weekend preference: walks."));
+    void customTextAndUnknownCommunitiesStayLocal() {
+        final SanitizedProfileSnapshot preferences = new SanitizedProfileSnapshot(
+                WeekendStyle.of("Contact me at private@example.invalid"), Set.of("private@example.invalid"));
+        assertTrue(preferences.isEmpty());
+        assertTrue(gateway("test-key").enrichPersona(preferences).isEmpty());
+        assertEquals(0, hits.get());
     }
 }

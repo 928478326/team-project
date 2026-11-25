@@ -153,9 +153,16 @@ src/
 - **验证方式**：运行 `mvn clean test`，查看 `target/site/jacoco/index.html` 中 `entity` 与 `use_case` 各包的覆盖率统计。
 
 ### 5.2 Checkstyle 静态检查与代码规范（拿 80%+ 质量分的硬门槛）
-- **硬性指标**：官方评分表规定，Code Quality 想要获得 **4/5 或 5/5**，**必须使用 Checkstyle（或同类静态检查工具）并在答辩中提供使用证据**。
-- **执行规范**：
-  - 在 Maven 或 IDE（IntelliJ Checkstyle-IDEA 插件）中启用课程 Checkstyle 规则进行检查，保留运行截图或 CI/Maven 检查记录作为答辩素材。
+- **硬性指标**：官方评分表规定，Code Quality 想要获得 **4/5 或 5/5**，**必须使用 Checkstyle（或同类静态检查工具）并在答辩中提供使用证据**（官方明确说明无需清零历史/骨架代码的全部警告，但必须有实际使用证据）。
+- **仓库已接入配置**：
+  - 根目录 [`mystyle.xml`](./mystyle.xml)：CSC207 课程标准 Checkstyle 规则集（与 Track A 已使用的规则完全一致）。
+  - [`pom.xml`](./pom.xml)：已集成 `maven-checkstyle-plugin`（Checkstyle `10.17.0`），不绑定 `validate` 阶段，确保日常 `mvn test` / `mvn compile` 不会被样式警告阻塞。
+  - [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)：`main` 分支每次 Push 及**所有目标分支的 PR（含 Stacked PR）**均自动运行单元测试与非阻塞式 Checkstyle 扫描，自动沉淀 PR 质量检查记录。
+- **本地与 IDE 使用方式**：
+  - **全量扫描**：`mvn checkstyle:check`（若仅查看报告不返回非零退出码，可加 `"-Dcheckstyle.failOnViolation=false"`；PowerShell 下 `-D` 参数需加双引号）。
+  - **按负责模块定向扫描**（推荐提 PR 前自检）：`mvn checkstyle:check "-Dcheckstyle.includes=use_case/your_module/**,interface_adapter/your_module/**"`。
+  - **IntelliJ IDEA 实时提示**：安装 `CheckStyle-IDEA` 插件 -> `Settings -> Tools -> Checkstyle` -> Checkstyle version 选 `10.17.0`（或兼容的 `10.x`–`14.x`）-> 点击 `+` 添加仓库根目录下的 `mystyle.xml` 并勾选启用。
+- **编码与提交红线**：
   - 遵循 Java 命名规范（类名 `UpperCamelCase`，方法/变量 `lowerCamelCase`，常量 `UPPER_SNAKE_CASE`，包名小写下划线 `use_case` / `interface_adapter` / `data_access`）。
   - 为公共类、接口及核心方法编写清晰的 Javadoc 注释（说明职责、参数、返回值与前置/后置条件）。
   - 严禁将 `.db`、`.ics`、`.env`、`target/`、IDE 个人配置等运行产物提交到 Git 仓库（已在 [.gitignore](./.gitignore) 中配置忽略）。

@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -64,8 +65,16 @@ public final class SqliteUserDataAccess
     }
 
     private Optional<User> find(String query, String value) {
-        try (Connection connection = database.openConnection();
-                PreparedStatement sql = connection.prepareStatement(query)) {
+        try (Connection connection = database.openConnection()) {
+            return find(connection, query, value);
+        }
+        catch (SQLException ex) {
+            throw new IllegalStateException("Could not read account.", ex);
+        }
+    }
+
+    private Optional<User> find(Connection connection, String query, String value) throws SQLException {
+        try (PreparedStatement sql = connection.prepareStatement(query)) {
             sql.setString(1, value);
             try (ResultSet row = sql.executeQuery()) {
                 Optional<User> found = Optional.empty();
@@ -74,9 +83,6 @@ public final class SqliteUserDataAccess
                 }
                 return found;
             }
-        }
-        catch (SQLException ex) {
-            throw new IllegalStateException("Could not read account.", ex);
         }
     }
 
@@ -108,19 +114,48 @@ public final class SqliteUserDataAccess
 
     @Override
     public void updateUserProfile(User user) {
+        try (Connection connection = database.openConnection()) {
+            writeProfile(connection, user);
+        }
+        catch (SQLException ex) {
+            throw new IllegalStateException("Could not update profile.", ex);
+        }
+    }
+
+    @Override
+    public boolean updateIfUnchanged(User expected, User updated) {
+        try (Connection connection = database.openConnection(); Statement transaction = connection.createStatement()) {
+            transaction.execute("BEGIN IMMEDIATE");
+            try {
+                final Optional<User> current = find(connection, "SELECT * FROM users WHERE user_id = ?",
+                        updated.getUserId());
+                final boolean matches = current.isPresent() && current.get().hasSameProfileAs(expected);
+                if (matches) {
+                    writeProfile(connection, updated);
+                }
+                transaction.execute("COMMIT");
+                return matches;
+            }
+            catch (SQLException | RuntimeException ex) {
+                transaction.execute("ROLLBACK");
+                throw ex;
+            }
+        }
+        catch (SQLException ex) {
+            throw new IllegalStateException("Could not update profile.", ex);
+        }
+    }
+
+    private void writeProfile(Connection connection, User user) throws SQLException {
         final String update = "UPDATE users SET display_name=?, bio=?, contact_info=?, weekend_style=?, "
                 + "interested_communities=?, utorid=?, share_contact_info=?, uoft_verified=?, "
                 + "llm_persona=? WHERE user_id=?";
-        try (Connection connection = database.openConnection();
-                PreparedStatement sql = connection.prepareStatement(update)) {
+        try (PreparedStatement sql = connection.prepareStatement(update)) {
             final int idParameter = bindProfile(sql, 1, user);
             sql.setString(idParameter, user.getUserId());
             if (sql.executeUpdate() == 0) {
                 throw new IllegalArgumentException("Unknown user ID.");
             }
-        }
-        catch (SQLException ex) {
-            throw new IllegalStateException("Could not update profile.", ex);
         }
     }
 

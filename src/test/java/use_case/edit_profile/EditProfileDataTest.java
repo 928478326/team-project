@@ -2,11 +2,11 @@ package use_case.edit_profile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import entity.LlmPersona;
 
 /**
  * Unit tests verifying null-safety and immutability contracts of {@link EditProfileInputData},
@@ -43,14 +43,10 @@ class EditProfileDataTest {
         assertEquals("", legacyOutput.withPrivateStatus(null, false, false, false).getUtorid());
 
         final LlmProfileEnrichmentGateway.SanitizedProfileSnapshot snapshot =
-                new LlmProfileEnrichmentGateway.SanitizedProfileSnapshot(
-                        null, null, null, null, LlmPersona.empty());
-        assertEquals("", snapshot.getDisplayName());
-        assertEquals("", snapshot.getBio());
+                new LlmProfileEnrichmentGateway.SanitizedProfileSnapshot(null, null);
         assertEquals("", snapshot.getWeekendStyleText());
         assertTrue(snapshot.getInterestedCommunityIds().isEmpty());
-        assertEquals(
-                LlmPersona.empty(),
-                LlmProfileEnrichmentGateway.identity().enrichPersona(snapshot));
+        assertTrue(snapshot.isEmpty());
+        assertNull(LlmProfileEnrichmentGateway.identity().enrichPersona(snapshot));
     }
 }
