@@ -1,7 +1,10 @@
 package use_case.login;
 
-import entity.PasswordHasher;
 import java.util.Objects;
+import java.util.Optional;
+
+import entity.PasswordHasher;
+import entity.User;
 
 /**
  * Interactor implementing the Login use case.
@@ -27,12 +30,31 @@ public final class LoginInteractor implements LoginInputBoundary {
 
     @Override
     public void execute(LoginInputData inputData) {
-        // TODO [Track A]:
-        // 1. Validate non-blank username and password.
-        // 2. Normalize username via User.normalizeUsername(...) and call findByUsername(...).
-        // 3. Verify password via user.matchesPasswordHash(passwordHasher.hash(password)).
-        // 4. On success call outputBoundary.prepareSuccessView(new LoginOutputData(...));
-        //    otherwise call outputBoundary.prepareFailView(...).
-        outputBoundary.prepareFailView("TODO [Track A]: Implement LoginInteractor.execute");
+        if (inputData.getUsername().isBlank() || inputData.getPassword().isBlank()) {
+            outputBoundary.prepareFailView("Enter your username and password.");
+        }
+        else {
+            authenticate(User.normalizeUsername(inputData.getUsername()), inputData.getPassword());
+        }
+    }
+
+    private void authenticate(String username, String password) {
+        Optional<User> authenticated = Optional.empty();
+        String failure = "Incorrect username or password.";
+        try {
+            authenticated = dataAccess.findByUsername(username)
+                    .filter(user -> passwordHasher.matches(password, user.getPasswordHash()));
+        }
+        catch (IllegalStateException ex) {
+            failure = "Could not load the account. Please try again.";
+        }
+        if (authenticated.isPresent()) {
+            final User user = authenticated.get();
+            outputBoundary.prepareSuccessView(new LoginOutputData(
+                    user.getUserId(), user.getUsername(), user.getDisplayName()));
+        }
+        else {
+            outputBoundary.prepareFailView(failure);
+        }
     }
 }

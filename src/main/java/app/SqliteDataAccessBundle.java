@@ -1,11 +1,6 @@
 package app;
 
-import data_access.gateway.HttpLlmRecommendationGateway;
-import data_access.gateway.IcsCalendarExporter;
-import data_access.gateway.LocalUoftCourseCatalogGateway;
-import data_access.gateway.NagerPublicHolidayGateway;
-import data_access.gateway.RuleBasedExplanationFallback;
-import data_access.in_memory.Sha256PasswordHasher;
+import data_access.sqlite.Pbkdf2PasswordHasher;
 import data_access.sqlite.SqliteDatabase;
 import data_access.sqlite.SqliteEventDataAccess;
 import data_access.sqlite.SqliteRatingDataAccess;
@@ -16,43 +11,31 @@ import entity.PasswordHasher;
 import use_case.browse_events.BrowseEventsDataAccessInterface;
 import use_case.create_event.CreateEventDataAccessInterface;
 import use_case.edit_profile.EditProfileDataAccessInterface;
-import use_case.edit_schedule.CourseCatalogGateway;
 import use_case.edit_schedule.EditScheduleDataAccessInterface;
 import use_case.join_event.JoinEventDataAccessInterface;
 import use_case.login.LoginDataAccessInterface;
 import use_case.match_course_buddies.MatchCourseBuddiesDataAccessInterface;
 import use_case.rate_buddy.RateBuddyDataAccessInterface;
-import use_case.recommend_buddies.LlmRecommendationGateway;
 import use_case.recommend_buddies.RecommendBuddiesDataAccessInterface;
 import use_case.signup.SignupDataAccessInterface;
-import use_case.view_calendar.CalendarExportGateway;
-import use_case.view_calendar.PublicHolidayGateway;
 import use_case.view_calendar.ViewCalendarDataAccessInterface;
 import use_case.view_rateable_buddies.ViewRateableBuddiesDataAccessInterface;
 
 /**
- * Production SQLite {@link DataAccessBundle}.
- * Activated once Track A completes {@link SqliteDatabase} and the {@code Sqlite*DataAccess} classes.
+ * SQLite wiring for the persistent account MVP. Feature DAOs share the database handle.
  */
-public final class SqliteDataAccessBundle implements DataAccessBundle {
+public final class SqliteDataAccessBundle extends AbstractGatewayBundle {
 
-    private final PasswordHasher passwordHasher = new Sha256PasswordHasher();
+    private final PasswordHasher passwordHasher = new Pbkdf2PasswordHasher();
     private final SqliteUserDataAccess userDao;
     private final SqliteEventDataAccess eventDao;
     private final SqliteScheduleDataAccess scheduleDao;
     private final SqliteRatingDataAccess ratingDao;
     private final SqliteRecommendationDataAccess recommendationDao;
 
-    private final PublicHolidayGateway holidayGateway = new NagerPublicHolidayGateway();
-    private final CalendarExportGateway exportGateway = new IcsCalendarExporter();
-    private final CourseCatalogGateway courseCatalogGateway = new LocalUoftCourseCatalogGateway();
-    private final LlmRecommendationGateway primaryLlmGateway = new HttpLlmRecommendationGateway();
-    private final LlmRecommendationGateway fallbackLlmGateway = new RuleBasedExplanationFallback();
-
     public SqliteDataAccessBundle(String dbFilePath) {
-        SqliteDatabase database = new SqliteDatabase(dbFilePath);
+        final SqliteDatabase database = new SqliteDatabase(dbFilePath);
         database.initializeSchema();
-        database.seedDemoDataIfEmpty(passwordHasher);
 
         this.userDao = new SqliteUserDataAccess(database);
         this.eventDao = new SqliteEventDataAccess(database);
@@ -97,23 +80,8 @@ public final class SqliteDataAccessBundle implements DataAccessBundle {
     }
 
     @Override
-    public PublicHolidayGateway publicHolidayGateway() {
-        return holidayGateway;
-    }
-
-    @Override
-    public CalendarExportGateway calendarExportGateway() {
-        return exportGateway;
-    }
-
-    @Override
     public EditScheduleDataAccessInterface editScheduleDataAccess() {
         return scheduleDao;
-    }
-
-    @Override
-    public CourseCatalogGateway courseCatalogGateway() {
-        return courseCatalogGateway;
     }
 
     @Override
@@ -139,15 +107,5 @@ public final class SqliteDataAccessBundle implements DataAccessBundle {
     @Override
     public RecommendBuddiesDataAccessInterface recommendBuddiesDataAccess() {
         return recommendationDao;
-    }
-
-    @Override
-    public LlmRecommendationGateway primaryLlmGateway() {
-        return primaryLlmGateway;
-    }
-
-    @Override
-    public LlmRecommendationGateway fallbackLlmGateway() {
-        return fallbackLlmGateway;
     }
 }
