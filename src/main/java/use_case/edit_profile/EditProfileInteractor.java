@@ -66,7 +66,7 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
                 loadFailure = "Could not load the profile. Please try again.";
             }
             if (existing.isEmpty()) {
-                outputBoundary.prepareFailView(loadFailure);
+                outputBoundary.prepareFailView(inputData.getUserId(), loadFailure);
             }
             else if (inputData.getAction() == EditProfileInputData.Action.LOAD) {
                 outputBoundary.prepareSuccessView(
@@ -99,10 +99,10 @@ public final class EditProfileInteractor implements EditProfileInputBoundary {
             savedProfile = toOutputData(finalUser, "Profile saved.");
         }
         catch (IllegalArgumentException ex) {
-            outputBoundary.prepareFailView(ex.getMessage());
+            outputBoundary.prepareFailView(inputData.getUserId(), ex.getMessage());
         }
         catch (IllegalStateException ex) {
-            outputBoundary.prepareFailView("Could not save the profile. Please try again.");
+            outputBoundary.prepareFailView(inputData.getUserId(), "Could not save the profile. Please try again.");
         }
         if (savedProfile != null) {
             outputBoundary.prepareSuccessView(savedProfile);

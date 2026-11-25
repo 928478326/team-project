@@ -1,5 +1,17 @@
 package app;
 
+import java.awt.CardLayout;
+import java.awt.Dimension;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.util.Objects;
+import java.util.Optional;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
+
 import entity.BuddyScoringStrategy;
 import entity.CommonUserFactory;
 import entity.CourseMatchStrategy;
@@ -42,15 +54,6 @@ import interface_adapter.recommendation.EditProfilePresenter;
 import interface_adapter.recommendation.RecommendBuddiesController;
 import interface_adapter.recommendation.RecommendBuddiesPresenter;
 import interface_adapter.recommendation.RecommendationViewModel;
-import java.awt.CardLayout;
-import java.awt.Dimension;
-import java.time.Clock;
-import java.time.ZoneId;
-import java.util.Objects;
-import java.util.Optional;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.WindowConstants;
 import use_case.browse_events.BrowseEventsInputBoundary;
 import use_case.browse_events.BrowseEventsInteractor;
 import use_case.browse_events.BrowseEventsOutputBoundary;
@@ -311,19 +314,30 @@ public final class AppBuilder {
         return this;
     }
 
-    /** Wires Track D use cases: Edit Profile, 3+4 Recommend Buddies. */
+    /**
+     * Wires profile editing and buddy recommendations.
+     * @return this builder
+     */
     public AppBuilder addProfileAndRecommendUseCases() {
-        EditProfileOutputBoundary editProfilePresenter =
-                new EditProfilePresenter(recommendationViewModel, sessionViewModel);
-        EditProfileInputBoundary editProfileInteractor =
+        final EditProfileOutputBoundary editProfilePresenter =
+                new EditProfilePresenter(recommendationViewModel, sessionViewModel, command -> {
+                    if (SwingUtilities.isEventDispatchThread()) {
+                        command.run();
+                    }
+                    else {
+                        SwingUtilities.invokeLater(command);
+                    }
+                });
+        final EditProfileInputBoundary editProfileInteractor =
                 new EditProfileInteractor(
-                        dataAccessBundle.editProfileDataAccess(), editProfilePresenter);
+                        dataAccessBundle.editProfileDataAccess(), editProfilePresenter,
+                        dataAccessBundle.profileEnrichmentGateway());
         profileAndRecommendView.setEditProfileController(
                 new EditProfileController(editProfileInteractor));
 
-        RecommendBuddiesOutputBoundary recommendPresenter =
+        final RecommendBuddiesOutputBoundary recommendPresenter =
                 new RecommendBuddiesPresenter(recommendationViewModel, zoneId);
-        RecommendBuddiesInputBoundary recommendInteractor =
+        final RecommendBuddiesInputBoundary recommendInteractor =
                 new RecommendBuddiesInteractor(
                         dataAccessBundle.recommendBuddiesDataAccess(),
                         buddyScoringStrategy,

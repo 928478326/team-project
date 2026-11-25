@@ -18,4 +18,13 @@ public interface EditProfileOutputBoundary {
      * @param errorMessage user-facing error message
      */
     void prepareFailView(String errorMessage);
+
+    /**
+     * Presents a failure for a particular owner, allowing asynchronous adapters to drop stale results.
+     * @param userId profile associated with this request
+     * @param errorMessage user-facing error
+     */
+    default void prepareFailView(String userId, String errorMessage) {
+        prepareFailView(errorMessage);
+    }
 }
