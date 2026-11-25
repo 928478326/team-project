@@ -53,7 +53,7 @@ class JoinEventInteractorTest {
     }
 
     @Test
-    void joiningTwiceIsASuccessWithoutAddingASecondSeat() {
+    void joiningTwiceSucceedsWithoutAddingSecondSeat() {
         final JoinEventInteractor interactor = interactorAt(NOW);
         interactor.execute(new JoinEventInputData("u-gracie", EVENT_ID));
         interactor.execute(new JoinEventInputData("u-gracie", EVENT_ID));
@@ -65,7 +65,7 @@ class JoinEventInteractorTest {
     }
 
     @Test
-    void aFullEventRejectsANewStudent() {
+    void fullEventRejectsNewStudent() {
         final JoinEventInteractor interactor = interactorAt(NOW);
         interactor.execute(new JoinEventInputData("u-gracie", EVENT_ID));
         interactor.execute(new JoinEventInputData("u-henry", EVENT_ID));

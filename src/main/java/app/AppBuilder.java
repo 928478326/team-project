@@ -262,7 +262,7 @@ public final class AppBuilder {
         communityEventsView.setJoinEventController(new JoinEventController(joinInteractor));
 
         ViewCalendarOutputBoundary calendarPresenter =
-                new ViewCalendarPresenter(calendarViewModel);
+                new ViewCalendarPresenter(calendarViewModel, sessionViewModel);
         ViewCalendarInputBoundary calendarInteractor =
                 new ViewCalendarInteractor(
                         dataAccessBundle.viewCalendarDataAccess(),

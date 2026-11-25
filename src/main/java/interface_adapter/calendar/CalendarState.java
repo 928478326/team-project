@@ -5,6 +5,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * UI state for the personal monthly Calendar view.
@@ -26,6 +27,7 @@ public final class CalendarState {
     private List<HolidayRow> holidays = Collections.emptyList();
     private String statusMessage = "";
     private String errorMessage = "";
+    private String ownerUserId = "";
 
     /** Starts on the current month in Toronto. */
     public CalendarState() {
@@ -55,7 +57,7 @@ public final class CalendarState {
     }
 
     public void setZoneLabel(String zoneLabel) {
-        this.zoneLabel = zoneLabel == null ? "" : zoneLabel;
+        this.zoneLabel = Objects.requireNonNullElse(zoneLabel, "");
     }
 
     public List<CalendarEventRow> getEvents() {
@@ -63,9 +65,8 @@ public final class CalendarState {
     }
 
     public void setEvents(List<CalendarEventRow> events) {
-        this.events = events == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(events));
+        this.events = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(events, Collections.emptyList())));
     }
 
     public List<HolidayRow> getHolidays() {
@@ -73,9 +74,8 @@ public final class CalendarState {
     }
 
     public void setHolidays(List<HolidayRow> holidays) {
-        this.holidays = holidays == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(holidays));
+        this.holidays = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(holidays, Collections.emptyList())));
     }
 
     public String getStatusMessage() {
@@ -83,7 +83,7 @@ public final class CalendarState {
     }
 
     public void setStatusMessage(String statusMessage) {
-        this.statusMessage = statusMessage == null ? "" : statusMessage;
+        this.statusMessage = Objects.requireNonNullElse(statusMessage, "");
     }
 
     public String getErrorMessage() {
@@ -91,7 +91,20 @@ public final class CalendarState {
     }
 
     public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage == null ? "" : errorMessage;
+        this.errorMessage = Objects.requireNonNullElse(errorMessage, "");
+    }
+
+    /**
+     * Returns the student whose events and messages this state holds.
+     *
+     * @return owner user ID, or {@code ""} before any calendar has loaded
+     */
+    public String getOwnerUserId() {
+        return ownerUserId;
+    }
+
+    public void setOwnerUserId(String ownerUserId) {
+        this.ownerUserId = Objects.requireNonNullElse(ownerUserId, "");
     }
 
     /**

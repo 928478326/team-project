@@ -15,7 +15,9 @@ public interface ViewCalendarOutputBoundary {
     /**
      * Presents an error when loading or exporting the calendar.
      *
+     * @param userId the student whose calendar was requested ({@code ""} if nobody was signed in),
+     *     so a presenter can ignore failures that arrive after that student signed out
      * @param errorMessage user-facing error message
      */
-    void prepareFailView(String errorMessage);
+    void prepareFailView(String userId, String errorMessage);
 }

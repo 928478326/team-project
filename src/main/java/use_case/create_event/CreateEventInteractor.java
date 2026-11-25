@@ -53,7 +53,13 @@ public final class CreateEventInteractor implements CreateEventInputBoundary {
 
     @Override
     public void execute(CreateEventInputData inputData) {
-        final String error = validate(inputData);
+        String error;
+        try {
+            error = validate(inputData);
+        }
+        catch (IllegalStateException ex) {
+            error = "Could not check the community. Please try again.";
+        }
         if (error.isEmpty()) {
             publish(inputData);
         }
@@ -91,12 +97,16 @@ public final class CreateEventInteractor implements CreateEventInputBoundary {
     }
 
     private String validateStartTime(String startsAtLocalText) {
-        final Optional<Instant> startsAt = parseStartsAt(startsAtLocalText);
+        final Optional<LocalDateTime> local = parseLocalStart(startsAtLocalText);
         final String error;
-        if (startsAt.isEmpty()) {
+        if (local.isEmpty()) {
             error = "Enter the start time as " + DATE_TIME_PATTERN + " (for example 2026-12-03 14:00).";
         }
-        else if (!startsAt.get().isAfter(clock.instant())) {
+        else if (isSkippedByClockChange(local.get())) {
+            error = "That time does not exist in Toronto because the clocks move forward for "
+                    + "daylight saving. Choose a different start time.";
+        }
+        else if (!toInstant(local.get()).isAfter(clock.instant())) {
             error = "The start time must be in the future.";
         }
         else {
@@ -113,7 +123,7 @@ public final class CreateEventInteractor implements CreateEventInputBoundary {
                 inputData.getTitle(),
                 inputData.getDescription(),
                 parseCapacity(inputData.getCapacityText()).orElseThrow(),
-                parseStartsAt(inputData.getStartsAtLocalText()).orElseThrow());
+                toInstant(parseLocalStart(inputData.getStartsAtLocalText()).orElseThrow()));
         boolean saved;
         try {
             dataAccess.saveEvent(event);
@@ -163,20 +173,42 @@ public final class CreateEventInteractor implements CreateEventInputBoundary {
     }
 
     /**
-     * Parses a Toronto-local {@code yyyy-MM-dd HH:mm} string into a UTC instant.
+     * Parses a Toronto-local {@code yyyy-MM-dd HH:mm} string.
      *
      * @param startsAtLocalText raw start time text
-     * @return the start instant, or empty if the text is not a real date-time
+     * @return the local start date-time, or empty if the text is not a real calendar date-time
      */
-    private Optional<Instant> parseStartsAt(String startsAtLocalText) {
-        Optional<Instant> result;
+    private static Optional<LocalDateTime> parseLocalStart(String startsAtLocalText) {
+        Optional<LocalDateTime> result;
         try {
-            final LocalDateTime local = LocalDateTime.parse(startsAtLocalText.trim(), START_TIME_FORMATTER);
-            result = Optional.of(local.atZone(zoneId).toInstant());
+            result = Optional.of(LocalDateTime.parse(startsAtLocalText.trim(), START_TIME_FORMATTER));
         }
         catch (DateTimeParseException ex) {
             result = Optional.empty();
         }
         return result;
+    }
+
+    /**
+     * Checks whether a local time falls in the hour skipped when daylight saving starts
+     * (for example 2027-03-14 02:30 in Toronto). Such a time has no valid UTC offset, and
+     * {@code atZone} would silently move it an hour later.
+     *
+     * @param local local start date-time
+     * @return {@code true} if the time never happens on the wall clock in the configured zone
+     */
+    private boolean isSkippedByClockChange(LocalDateTime local) {
+        return zoneId.getRules().getValidOffsets(local).isEmpty();
+    }
+
+    /**
+     * Converts a local start time to an instant. When the clocks fall back and a time happens
+     * twice, the earlier occurrence (daylight time) is used.
+     *
+     * @param local local start date-time that exists in the configured zone
+     * @return the start instant
+     */
+    private Instant toInstant(LocalDateTime local) {
+        return local.atZone(zoneId).toInstant();
     }
 }

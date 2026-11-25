@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Immutable output data for browsing community events.
@@ -29,12 +30,10 @@ public final class BrowseEventsOutputData {
     public BrowseEventsOutputData(
             String selectedCommunityId, List<EventItem> events, List<CommunityOption> communities) {
         this.selectedCommunityId = selectedCommunityId;
-        this.events = events == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(events));
-        this.communities = communities == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(communities));
+        this.events = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(events, Collections.emptyList())));
+        this.communities = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(communities, Collections.emptyList())));
     }
 
     public String getSelectedCommunityId() {

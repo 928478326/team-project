@@ -62,7 +62,7 @@ class IcsCalendarExporterTest {
     }
 
     @Test
-    void writesAValidCalendarWithOneVeventPerEvent() throws IOException {
+    void writesValidCalendarWithOneVeventPerEvent() throws IOException {
         final Path file = tempDir().resolve("december.ics");
         final List<Event> events = List.of(
                 event("e-1", "CSC207 Review", "Bahen 1180", ZonedDateTime.of(2026, 12, 3, 14, 0, 0, 0, TORONTO)),
@@ -83,12 +83,12 @@ class IcsCalendarExporterTest {
         assertTrue(lines.contains("SUMMARY:CSC207 Review"));
         assertTrue(lines.contains("DESCRIPTION:Bahen 1180"));
         assertTrue(lines.contains("CATEGORIES:study"));
-        assertEquals(1L, lines.stream().filter(l -> l.startsWith("DESCRIPTION:")).count(),
+        assertEquals(1L, lines.stream().filter(line -> line.startsWith("DESCRIPTION:")).count(),
                 "an event with no description gets no DESCRIPTION line");
     }
 
     @Test
-    void torontoTimesAreWrittenInUtcWithAOneHourDuration() {
+    void torontoTimesAreWrittenInUtcWithOneHourDuration() {
         final String ics = exporter.toIcs(
                 List.of(event("e-1", "Review", "", ZonedDateTime.of(2026, 12, 3, 14, 0, 0, 0, TORONTO))),
                 TORONTO);
@@ -122,7 +122,11 @@ class IcsCalendarExporterTest {
 
     @Test
     void longLinesAreFoldedWithoutBreakingChineseCharacters() {
-        final String title = "多伦多大学期末复习小组：CSC207 Clean Architecture 和 SOLID 设计原则一起刷题，欢迎所有同学参加！";
+        // A long Chinese title (written as Unicode escapes so the source file stays ASCII).
+        final String title = "\u591a\u4f26\u591a\u5927\u5b66\u671f\u672b\u590d\u4e60\u5c0f\u7ec4\uff1a"
+                + "CSC207 Clean Architecture " + "\u548c" + " SOLID "
+                + "\u8bbe\u8ba1\u539f\u5219\u4e00\u8d77\u5237\u9898\uff0c"
+                + "\u6b22\u8fce\u6240\u6709\u540c\u5b66\u53c2\u52a0\uff01";
         final String ics = exporter.toIcs(
                 List.of(event("e-1", title, "", ZonedDateTime.of(2026, 12, 3, 14, 0, 0, 0, TORONTO))), TORONTO);
 
@@ -134,7 +138,7 @@ class IcsCalendarExporterTest {
     }
 
     @Test
-    void emptyMonthStillProducesAValidCalendar() {
+    void emptyMonthStillProducesValidCalendar() {
         final List<String> lines = unfoldedLines(exporter.toIcs(List.of(), TORONTO));
 
         assertEquals("BEGIN:VCALENDAR", lines.get(0));

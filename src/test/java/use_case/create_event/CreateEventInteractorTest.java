@@ -82,7 +82,7 @@ class CreateEventInteractorTest {
         "u-james, study, Review, 4,   2026-12-03 25:00, impossible hour",
         "u-james, study, Review, 4,   '',               missing start time",
         "u-james, study, Review, 4,   2026-11-24 11:59, start time in the past",
-        "u-james, study, Review, 4,   2026-11-24 12:00, start time exactly now",
+        "u-james, study, Review, 4,   2026-11-24 12:00, start time exactly now"
     })
     void invalidInputIsRejectedAndNothingIsSaved(
             String creator, String community, String title, String capacity, String startsAt, String reason) {
@@ -105,6 +105,64 @@ class CreateEventInteractorTest {
             @Override
             public void saveEvent(Event event) {
                 throw new IllegalStateException("database is locked");
+            }
+        };
+        final CreateEventInteractor failing =
+                new CreateEventInteractor(failingDao, presenter, Clock.fixed(NOW, TORONTO), TORONTO);
+
+        failing.execute(new CreateEventInputData("u-james", "study", "Review", "", "4", "2026-12-03 14:00"));
+
+        assertNull(presenter.success);
+        assertNotNull(presenter.error);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2027-03-14 02:00", "2027-03-14 02:30", "2027-03-14 02:59"})
+    void startTimeSkippedByDaylightSavingIsRejected(String startsAt) {
+        interactor.execute(new CreateEventInputData("u-james", "study", "Review", "", "4", startsAt));
+
+        assertNull(presenter.success);
+        assertNotNull(presenter.error);
+        assertTrue(presenter.error.contains("daylight saving"), presenter.error);
+        assertTrue(store.eventsById().isEmpty());
+    }
+
+    @Test
+    void timesAroundTheSpringForwardGapAreAccepted() {
+        interactor.execute(new CreateEventInputData(
+                "u-james", "study", "Before", "", "4", "2027-03-14 01:59"));
+        assertNotNull(presenter.success);
+        assertEquals(ZonedDateTime.of(2027, 3, 14, 1, 59, 0, 0, TORONTO).toInstant(),
+                presenter.success.getStartsAt());
+
+        interactor.execute(new CreateEventInputData(
+                "u-james", "study", "After", "", "4", "2027-03-14 03:00"));
+        assertEquals(ZonedDateTime.of(2027, 3, 14, 3, 0, 0, 0, TORONTO).toInstant(),
+                presenter.success.getStartsAt());
+        assertEquals(2, store.eventsById().size());
+    }
+
+    @Test
+    void repeatedFallBackHourUsesTheFirstOccurrence() {
+        interactor.execute(new CreateEventInputData(
+                "u-james", "study", "Late review", "", "4", "2027-11-07 01:30"));
+
+        assertNull(presenter.error);
+        // 01:30 happens twice that night; the first one is still on daylight time (UTC-4).
+        assertEquals(Instant.parse("2027-11-07T05:30:00Z"), presenter.success.getStartsAt());
+    }
+
+    @Test
+    void storageFailureWhileCheckingTheCommunityIsReportedToTheUser() {
+        final CreateEventDataAccessInterface failingDao = new CreateEventDataAccessInterface() {
+            @Override
+            public boolean communityExists(String communityId) {
+                throw new IllegalStateException("database is locked");
+            }
+
+            @Override
+            public void saveEvent(Event event) {
+                throw new AssertionError("must not save when the community check failed");
             }
         };
         final CreateEventInteractor failing =

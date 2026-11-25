@@ -62,10 +62,10 @@ public final class ViewCalendarInteractor implements ViewCalendarInputBoundary {
     public void execute(ViewCalendarInputData inputData) {
         final Optional<YearMonth> yearMonth = toYearMonth(inputData.getYear(), inputData.getMonth());
         if (inputData.getUserId().isEmpty()) {
-            outputBoundary.prepareFailView("Sign in to view your calendar.");
+            outputBoundary.prepareFailView(inputData.getUserId(), "Sign in to view your calendar.");
         }
         else if (yearMonth.isEmpty()) {
-            outputBoundary.prepareFailView("Choose a valid month (1-12).");
+            outputBoundary.prepareFailView(inputData.getUserId(), "Choose a valid month (1-12).");
         }
         else {
             loadMonth(inputData, yearMonth.get());
@@ -76,26 +76,31 @@ public final class ViewCalendarInteractor implements ViewCalendarInputBoundary {
         final Instant start = yearMonth.atDay(1).atStartOfDay(zoneId).toInstant();
         final Instant end = yearMonth.plusMonths(1).atDay(1).atStartOfDay(zoneId).toInstant();
         List<Event> events;
+        Map<String, String> communityNames;
         try {
             events = new ArrayList<>(dataAccess.findJoinedEventsBetween(inputData.getUserId(), start, end));
             events.sort(EVENT_ORDER);
+            communityNames = communityNamesById();
         }
         catch (IllegalStateException ex) {
             events = null;
+            communityNames = null;
         }
 
         if (events == null) {
-            outputBoundary.prepareFailView("Could not load your calendar. Please try again.");
+            outputBoundary.prepareFailView(inputData.getUserId(), "Could not load your calendar. Please try again.");
         }
         else if (inputData.isExportRequested()) {
-            exportThenPresent(inputData.getExportFilePath(), yearMonth, events);
+            exportThenPresent(inputData, yearMonth, events, communityNames);
         }
         else {
-            present(yearMonth, events, "");
+            present(inputData.getUserId(), yearMonth, events, communityNames, "");
         }
     }
 
-    private void exportThenPresent(String exportFilePath, YearMonth yearMonth, List<Event> events) {
+    private void exportThenPresent(ViewCalendarInputData inputData, YearMonth yearMonth, List<Event> events,
+                                   Map<String, String> communityNames) {
+        final String exportFilePath = inputData.getExportFilePath();
         String failure = "";
         try {
             exportGateway.exportToIcs(events, zoneId, exportFilePath);
@@ -104,15 +109,16 @@ public final class ViewCalendarInteractor implements ViewCalendarInputBoundary {
             failure = "Could not export the calendar: " + ex.getMessage();
         }
         if (failure.isEmpty()) {
-            present(yearMonth, events, "Exported " + events.size() + " event(s) to " + exportFilePath);
+            present(inputData.getUserId(), yearMonth, events, communityNames,
+                    "Exported " + events.size() + " event(s) to " + exportFilePath);
         }
         else {
-            outputBoundary.prepareFailView(failure);
+            outputBoundary.prepareFailView(inputData.getUserId(), failure);
         }
     }
 
-    private void present(YearMonth yearMonth, List<Event> events, String statusMessage) {
-        final Map<String, String> communityNames = communityNamesById();
+    private void present(String userId, YearMonth yearMonth, List<Event> events,
+                         Map<String, String> communityNames, String statusMessage) {
         final List<ViewCalendarOutputData.CalendarEventItem> eventItems = new ArrayList<>();
         for (Event event : events) {
             eventItems.add(new ViewCalendarOutputData.CalendarEventItem(
@@ -122,6 +128,7 @@ public final class ViewCalendarInteractor implements ViewCalendarInputBoundary {
                     event.getStartsAt()));
         }
         outputBoundary.prepareSuccessView(new ViewCalendarOutputData(
+                userId,
                 yearMonth.getYear(),
                 yearMonth.getMonthValue(),
                 zoneId.getId(),
@@ -133,6 +140,9 @@ public final class ViewCalendarInteractor implements ViewCalendarInputBoundary {
     /**
      * Fetches the year's holidays and keeps only those in {@code yearMonth}, sorted by date.
      * Any failure from the external API means "no holidays", never a failed calendar.
+     *
+     * @param yearMonth the month being shown
+     * @return that month's holidays, possibly empty
      */
     private List<ViewCalendarOutputData.HolidayItem> holidaysIn(YearMonth yearMonth) {
         List<PublicHoliday> fetched;
@@ -159,6 +169,9 @@ public final class ViewCalendarInteractor implements ViewCalendarInputBoundary {
     /**
      * Prefers the local name (e.g. "Boxing Day") over Nager.Date's international name
      * (e.g. "St. Stephen's Day"), since that is what students in Toronto call it.
+     *
+     * @param holiday one holiday from the gateway
+     * @return the name to show, or {@code ""} if the gateway gave none
      */
     private static String holidayName(PublicHoliday holiday) {
         final String name;

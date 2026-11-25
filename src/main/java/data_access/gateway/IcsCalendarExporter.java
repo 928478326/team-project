@@ -35,6 +35,8 @@ public final class IcsCalendarExporter implements CalendarExportGateway {
 
     /** RFC 5545 line terminator. */
     private static final String CRLF = "\r\n";
+    /** RFC 5545 escape for a line break inside a text value: a backslash followed by {@code n}. */
+    private static final String ESCAPED_NEWLINE = "\\n";
     /** RFC 5545 section 3.1: content lines should not exceed 75 octets. */
     private static final int MAX_LINE_OCTETS = 75;
     private static final DateTimeFormatter UTC_FORMAT =
@@ -130,15 +132,18 @@ public final class IcsCalendarExporter implements CalendarExportGateway {
         return text.replace("\\", "\\\\")
                 .replace(";", "\\;")
                 .replace(",", "\\,")
-                .replace("\r\n", "\\n")
-                .replace("\n", "\\n")
-                .replace("\r", "\\n");
+                .replace("\r\n", ESCAPED_NEWLINE)
+                .replace("\n", ESCAPED_NEWLINE)
+                .replace("\r", ESCAPED_NEWLINE);
     }
 
     /**
      * Appends one content line, folding it so no physical line exceeds 75 UTF-8 bytes.
      * Continuation lines start with a single space (RFC 5545 section 3.1). Folding never splits
      * a multi-byte character such as a Chinese character or emoji.
+     *
+     * @param ics calendar text being built
+     * @param content one unfolded content line, without its line ending
      */
     private static void line(StringBuilder ics, String content) {
         int lineOctets = 0;

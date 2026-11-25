@@ -126,7 +126,7 @@ class BrowseEventsInteractorTest {
     }
 
     @Test
-    void missingCreatorFallsBackToAPlaceholderName() {
+    void missingCreatorFallsBackToPlaceholderName() {
         interactor.execute(new BrowseEventsInputData("u-viewer", "study"));
 
         assertEquals(BrowseEventsInteractor.UNKNOWN_CREATOR, item("e-3").getCreatorDisplayName());

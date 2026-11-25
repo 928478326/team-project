@@ -3,6 +3,7 @@ package interface_adapter.community;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * UI state for the Community Events view.
@@ -23,7 +24,7 @@ public final class CommunityEventsState {
     }
 
     public void setSelectedCommunityId(String selectedCommunityId) {
-        this.selectedCommunityId = selectedCommunityId == null ? "ALL" : selectedCommunityId;
+        this.selectedCommunityId = Objects.requireNonNullElse(selectedCommunityId, "ALL");
     }
 
     public List<EventRow> getEvents() {
@@ -31,9 +32,8 @@ public final class CommunityEventsState {
     }
 
     public void setEvents(List<EventRow> events) {
-        this.events = events == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(events));
+        this.events = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(events, Collections.emptyList())));
     }
 
     public List<CommunityOption> getCommunities() {
@@ -41,9 +41,8 @@ public final class CommunityEventsState {
     }
 
     public void setCommunities(List<CommunityOption> communities) {
-        this.communities = communities == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(communities));
+        this.communities = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(communities, Collections.emptyList())));
     }
 
     public String getStatusMessage() {
@@ -51,7 +50,7 @@ public final class CommunityEventsState {
     }
 
     public void setStatusMessage(String statusMessage) {
-        this.statusMessage = statusMessage == null ? "" : statusMessage;
+        this.statusMessage = Objects.requireNonNullElse(statusMessage, "");
     }
 
     public String getErrorMessage() {
@@ -59,7 +58,7 @@ public final class CommunityEventsState {
     }
 
     public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage == null ? "" : errorMessage;
+        this.errorMessage = Objects.requireNonNullElse(errorMessage, "");
     }
 
     public boolean isClearCreateForm() {

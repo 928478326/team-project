@@ -83,6 +83,7 @@ class ViewCalendarInteractorTest {
         interactor.execute(new ViewCalendarInputData(USER, 2026, 12, ""));
 
         assertNull(presenter.error);
+        assertEquals(USER, presenter.success.getUserId());
         assertEquals(2026, presenter.success.getYear());
         assertEquals(12, presenter.success.getMonth());
         assertEquals("America/Toronto", presenter.success.getZoneId());
@@ -132,7 +133,7 @@ class ViewCalendarInteractorTest {
     }
 
     @Test
-    void viewingWithoutAnExportPathDoesNotWriteAFile() {
+    void viewingWithoutAnExportPathDoesNotWriteFile() {
         interactor.execute(new ViewCalendarInputData(USER, 2026, 12, "  "));
 
         assertNull(exporter.path);
@@ -157,6 +158,31 @@ class ViewCalendarInteractorTest {
 
         assertNull(presenter.success);
         assertTrue(presenter.error.contains("disk full"));
+        assertEquals(USER, presenter.errorUserId);
+    }
+
+    @Test
+    void storageFailureWhileReadingCommunityNamesIsReportedToTheUser() {
+        final InMemoryEventDataAccess events = new InMemoryEventDataAccess(store);
+        final ViewCalendarDataAccessInterface failingDao = new ViewCalendarDataAccessInterface() {
+            @Override
+            public List<Event> findJoinedEventsBetween(String userId, Instant start, Instant end) {
+                return events.findJoinedEventsBetween(userId, start, end);
+            }
+
+            @Override
+            public List<Community> findAllCommunities() {
+                throw new IllegalStateException("database is locked");
+            }
+        };
+        final ViewCalendarInteractor failing =
+                new ViewCalendarInteractor(failingDao, holidays, exporter, presenter, TORONTO);
+
+        failing.execute(new ViewCalendarInputData(USER, 2026, 12, "out/december.ics"));
+
+        assertNull(presenter.success);
+        assertNotNull(presenter.error);
+        assertNull(exporter.path);
     }
 
     @ParameterizedTest
@@ -212,6 +238,7 @@ class ViewCalendarInteractorTest {
     private static final class RecordingPresenter implements ViewCalendarOutputBoundary {
         private ViewCalendarOutputData success;
         private String error;
+        private String errorUserId;
 
         @Override
         public void prepareSuccessView(ViewCalendarOutputData outputData) {
@@ -219,7 +246,8 @@ class ViewCalendarInteractorTest {
         }
 
         @Override
-        public void prepareFailView(String errorMessage) {
+        public void prepareFailView(String userId, String errorMessage) {
+            errorUserId = userId;
             error = errorMessage;
         }
     }

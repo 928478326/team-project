@@ -51,7 +51,9 @@ import interface_adapter.calendar.ViewCalendarController;
  * middle, and a list of the month's events and holidays on the right.
  *
  * <p>Every load runs through a {@link SwingWorker} because it may call the remote holiday API;
- * the buttons are disabled meanwhile so only one request is in flight.
+ * the buttons are disabled meanwhile so only one request is in flight. When a different student
+ * signs in, the previous student's request is abandoned: the controls unlock straight away and
+ * only a state owned by the signed-in student is ever drawn.
  *
  * <p><b>Owner: Track B (Community &amp; Calendar Lead)</b>
  */
@@ -75,6 +77,8 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
     private static final Color OUTSIDE_MONTH_COLOR = new Color(245, 245, 245);
     private static final Color ERROR_COLOR = new Color(180, 0, 0);
     private static final Color SUCCESS_COLOR = new Color(0, 120, 0);
+    /** A single space keeps an empty label at its normal height. */
+    private static final String BLANK_LABEL = " ";
     private static final DateTimeFormatter AGENDA_DATE_FORMAT =
             DateTimeFormatter.ofPattern("EEE MMM d", Locale.ENGLISH);
 
@@ -85,15 +89,19 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
     private final JButton nextButton = new JButton("Next >");
     private final JButton thisMonthButton = new JButton("This month");
     private final JButton exportButton = new JButton("Export month to .ics...");
-    private final JLabel monthLabel = new JLabel(" ", SwingConstants.CENTER);
+    private final JLabel monthLabel = new JLabel(BLANK_LABEL, SwingConstants.CENTER);
     private final JPanel weekdayHeader = new JPanel(new GridLayout(1, DAYS_PER_WEEK, CELL_GAP, 0));
     private final JPanel gridPanel = new JPanel(new GridLayout(0, DAYS_PER_WEEK, CELL_GAP, CELL_GAP));
     private final JTextArea agendaArea = new JTextArea(AGENDA_ROWS, AGENDA_COLUMNS);
-    private final JLabel zoneLabel = new JLabel(" ");
-    private final JLabel statusLabel = new JLabel(" ");
+    private final JLabel zoneLabel = new JLabel(BLANK_LABEL);
+    private final JLabel statusLabel = new JLabel(BLANK_LABEL);
 
     private ViewCalendarController viewCalendarController;
     private boolean loading;
+    /** Bumped on every sign-in change so a request from the previous student cannot unlock the UI. */
+    private int requestGeneration;
+    /** The student the calendar is currently drawn for, or {@code ""} when signed out. */
+    private String shownUserId = "";
 
     public CalendarView(CalendarViewModel viewModel, SessionViewModel sessionViewModel) {
         this.viewModel = Objects.requireNonNull(viewModel, "viewModel must not be null");
@@ -109,6 +117,10 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
         add(buildAgendaPanel(), BorderLayout.EAST);
         add(buildStatusBar(), BorderLayout.SOUTH);
 
+        final SessionState session = sessionViewModel.getState();
+        if (session != null && session.isLoggedIn()) {
+            shownUserId = session.getUserId();
+        }
         render(viewModel.getState(), false);
     }
 
@@ -218,8 +230,10 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
                     JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
             if (confirmed) {
                 final String path = target.getAbsolutePath();
-                runInBackground("Exporting...", () -> viewCalendarController.exportMonth(
-                        session.getUserId(), month.getYear(), month.getMonthValue(), path));
+                runInBackground("Exporting...", () -> {
+                    viewCalendarController.exportMonth(
+                            session.getUserId(), month.getYear(), month.getMonthValue(), path);
+                });
             }
         }
     }
@@ -227,8 +241,12 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
     /**
      * Runs a controller call off the Event Dispatch Thread. The presenter's update reaches
      * {@link #propertyChange} on the worker thread and is re-posted to the EDT there.
+     *
+     * @param message status text shown while the request runs
+     * @param controllerCall the controller call to run in the background
      */
     private void runInBackground(String message, Runnable controllerCall) {
+        final int generation = requestGeneration;
         setLoading(true);
         showStatus(message, false);
         new SwingWorker<Void, Void>() {
@@ -240,7 +258,9 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
 
             @Override
             protected void done() {
-                setLoading(false);
+                if (generation == requestGeneration) {
+                    setLoading(false);
+                }
             }
         }.execute();
     }
@@ -255,23 +275,46 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
 
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        final Runnable updateTask = () -> {
-            if (evt.getSource() == sessionViewModel) {
-                final SessionState session = (SessionState) evt.getNewValue();
-                if (session != null && !session.isLoggedIn()) {
-                    render(viewModel.getState(), false);
-                    showStatus("", false);
-                }
-            }
-            else if (evt.getSource() == viewModel) {
-                render((CalendarState) evt.getNewValue(), true);
-            }
-        };
         if (SwingUtilities.isEventDispatchThread()) {
-            updateTask.run();
+            handleChange(evt);
         }
         else {
-            SwingUtilities.invokeLater(updateTask);
+            SwingUtilities.invokeLater(() -> handleChange(evt));
+        }
+    }
+
+    private void handleChange(PropertyChangeEvent evt) {
+        if (evt.getSource() == sessionViewModel) {
+            onSessionChanged((SessionState) evt.getNewValue());
+        }
+        else if (evt.getSource() == viewModel) {
+            final CalendarState state = (CalendarState) evt.getNewValue();
+            // Draw only a calendar that belongs to the student who is signed in right now.
+            if (!shownUserId.isEmpty() && shownUserId.equals(state.getOwnerUserId())) {
+                render(state, true);
+            }
+        }
+    }
+
+    /**
+     * Clears the calendar whenever the signed-in student changes (logout, or a different login).
+     *
+     * @param session the new session state
+     */
+    private void onSessionChanged(SessionState session) {
+        final String userId;
+        if (session != null && session.isLoggedIn()) {
+            userId = session.getUserId();
+        }
+        else {
+            userId = "";
+        }
+        if (!userId.equals(shownUserId)) {
+            shownUserId = userId;
+            requestGeneration++;
+            setLoading(false);
+            render(viewModel.getState(), false);
+            showStatus("", false);
         }
     }
 
@@ -283,8 +326,12 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
      */
     private void render(CalendarState state, boolean showData) {
         final YearMonth month = YearMonth.of(state.getYear(), state.getMonth());
-        final List<CalendarEventRow> events = showData ? state.getEvents() : new ArrayList<>();
-        final List<HolidayRow> holidays = showData ? state.getHolidays() : new ArrayList<>();
+        List<CalendarEventRow> events = new ArrayList<>();
+        List<HolidayRow> holidays = new ArrayList<>();
+        if (showData) {
+            events = state.getEvents();
+            holidays = state.getHolidays();
+        }
 
         monthLabel.setText(monthTitle(month));
         zoneLabel.setText("Times shown in " + state.getZoneLabel());
@@ -297,8 +344,11 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
             else if (!state.getStatusMessage().isBlank()) {
                 showStatus(state.getStatusMessage(), false);
             }
+            else if (events.isEmpty()) {
+                showStatus("No joined events this month.", false);
+            }
             else {
-                showStatus(events.isEmpty() ? "No joined events this month." : "", false);
+                showStatus("", false);
             }
         }
     }
@@ -328,11 +378,7 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
     private static JPanel dayCell(int day, boolean isToday, List<CalendarEventRow> events, List<HolidayRow> holidays) {
         final JPanel cell = new JPanel(new BorderLayout());
         cell.setBackground(Color.WHITE);
-        final int inner = isToday ? CELL_PADDING - 2 : CELL_PADDING;
-        final Border padding = BorderFactory.createEmptyBorder(inner, inner, inner, inner);
-        cell.setBorder(isToday
-                ? BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(TODAY_COLOR, 2), padding)
-                : padding);
+        cell.setBorder(dayBorder(isToday));
 
         final JLabel number = new JLabel(String.valueOf(day));
         number.setFont(number.getFont().deriveFont(Font.BOLD));
@@ -353,7 +399,7 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
         for (CalendarEventRow event : events) {
             if (event.getDayOfMonth() == day) {
                 html.append("<font color='").append(hex(EVENT_COLOR)).append("'>")
-                        .append(escapeHtml(event.getTimeText() + " " + event.getTitle())).append("</font><br>");
+                        .append(escapeHtml(event.getTimeText() + ' ' + event.getTitle())).append("</font><br>");
                 tooltip.append(event.getTimeText()).append(' ').append(event.getTitle()).append("  ");
             }
         }
@@ -379,13 +425,19 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
             }
         }
         if (!holidays.isEmpty()) {
-            text.append(text.length() > 0 ? "\n" : "").append("ONTARIO HOLIDAYS\n");
+            if (text.length() > 0) {
+                text.append('\n');
+            }
+            text.append("ONTARIO HOLIDAYS\n");
             for (HolidayRow holiday : holidays) {
                 text.append(month.atDay(holiday.getDayOfMonth()).format(AGENDA_DATE_FORMAT))
                         .append("  ").append(holiday.getName()).append('\n');
             }
         }
-        agendaArea.setText(text.length() == 0 ? "Nothing scheduled." : text.toString());
+        if (text.length() == 0) {
+            text.append("Nothing scheduled.");
+        }
+        agendaArea.setText(text.toString());
         agendaArea.setCaretPosition(0);
     }
 
@@ -406,12 +458,41 @@ public final class CalendarView extends JPanel implements PropertyChangeListener
     }
 
     private void showStatus(String message, boolean error) {
-        statusLabel.setForeground(error ? ERROR_COLOR : SUCCESS_COLOR);
-        statusLabel.setText(message == null || message.isBlank() ? " " : message);
+        if (error) {
+            statusLabel.setForeground(ERROR_COLOR);
+        }
+        else {
+            statusLabel.setForeground(SUCCESS_COLOR);
+        }
+        if (message == null || message.isBlank()) {
+            statusLabel.setText(BLANK_LABEL);
+        }
+        else {
+            statusLabel.setText(message);
+        }
+    }
+
+    /**
+     * Builds the cell border: plain padding, or a blue outline around today's cell.
+     *
+     * @param isToday whether the cell shows today's date
+     * @return the border for the cell
+     */
+    private static Border dayBorder(boolean isToday) {
+        final Border border;
+        if (isToday) {
+            final int inner = CELL_PADDING - 2;
+            border = BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(TODAY_COLOR, 2),
+                    BorderFactory.createEmptyBorder(inner, inner, inner, inner));
+        }
+        else {
+            border = BorderFactory.createEmptyBorder(CELL_PADDING, CELL_PADDING, CELL_PADDING, CELL_PADDING);
+        }
+        return border;
     }
 
     private static String monthTitle(YearMonth month) {
-        return month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + month.getYear();
+        return month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + ' ' + month.getYear();
     }
 
     private static String hex(Color color) {

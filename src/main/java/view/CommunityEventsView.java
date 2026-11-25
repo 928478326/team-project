@@ -59,6 +59,9 @@ import interface_adapter.community.JoinEventController;
 public final class CommunityEventsView extends JPanel implements PropertyChangeListener {
 
     private static final String ALL_COMMUNITIES_ID = "ALL";
+    /** A single space keeps an empty label at its normal height. */
+    private static final String BLANK_LABEL = " ";
+    private static final String JOIN_TEXT = "Join event";
     private static final String[] COLUMNS = {"When", "Community", "Event", "Organizer", "Spots", "Status"};
     private static final int[] COLUMN_WIDTHS = {130, 80, 220, 90, 55, 70};
     private static final int GAP = 8;
@@ -82,7 +85,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
     private final DefaultComboBoxModel<CommunityOption> filterModel = new DefaultComboBoxModel<>();
     private final JComboBox<CommunityOption> filterCombo = new JComboBox<>(filterModel);
     private final JButton refreshButton = new JButton("Refresh");
-    private final JLabel listHintLabel = new JLabel(" ");
+    private final JLabel listHintLabel = new JLabel(BLANK_LABEL);
 
     private final DefaultTableModel tableModel = new DefaultTableModel(COLUMNS, 0) {
         @Override
@@ -92,7 +95,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
     };
     private final JTable eventTable = new JTable(tableModel);
     private final JTextArea detailsArea = new JTextArea(DETAILS_ROWS, TEXT_COLUMNS);
-    private final JButton joinButton = new JButton("Join event");
+    private final JButton joinButton = new JButton(JOIN_TEXT);
 
     private final DefaultComboBoxModel<CommunityOption> createCommunityModel = new DefaultComboBoxModel<>();
     private final JComboBox<CommunityOption> createCommunityCombo = new JComboBox<>(createCommunityModel);
@@ -103,7 +106,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
     private final JTextField startsAtField = new JTextField(TEXT_COLUMNS);
     private final JButton publishButton = new JButton("Publish event");
 
-    private final JLabel feedbackLabel = new JLabel(" ");
+    private final JLabel feedbackLabel = new JLabel(BLANK_LABEL);
 
     private List<EventRow> rows = Collections.emptyList();
     private List<CommunityOption> knownCommunities = Collections.emptyList();
@@ -237,7 +240,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
         form.add(publishButton, gbc);
         gbc.gridy++;
         gbc.weighty = 1;
-        form.add(new JLabel(" "), gbc);
+        form.add(new JLabel(BLANK_LABEL), gbc);
 
         publishButton.addActionListener(event -> publishEvent());
         return form;
@@ -256,7 +259,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
         if (createEventController != null && session.isLoggedIn()) {
             createEventController.execute(
                     session.getUserId(),
-                    community == null ? "" : community.getCommunityId(),
+                    communityIdOf(community),
                     titleField.getText(),
                     descriptionArea.getText(),
                     String.valueOf(capacitySpinner.getValue()),
@@ -276,25 +279,26 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
 
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        final Runnable updateTask = () -> {
-            if (evt.getSource() == sessionViewModel) {
-                final SessionState session = (SessionState) evt.getNewValue();
-                if (session != null && !session.isLoggedIn()) {
-                    clearForLogout();
-                }
-            }
-            else if (CommunityEventsViewModel.FEEDBACK_PROPERTY.equals(evt.getPropertyName())) {
-                renderFeedback((CommunityEventsState) evt.getNewValue());
-            }
-            else {
-                renderList((CommunityEventsState) evt.getNewValue());
-            }
-        };
         if (SwingUtilities.isEventDispatchThread()) {
-            updateTask.run();
+            handleChange(evt);
         }
         else {
-            SwingUtilities.invokeLater(updateTask);
+            SwingUtilities.invokeLater(() -> handleChange(evt));
+        }
+    }
+
+    private void handleChange(PropertyChangeEvent evt) {
+        if (evt.getSource() == sessionViewModel) {
+            final SessionState session = (SessionState) evt.getNewValue();
+            if (session != null && !session.isLoggedIn()) {
+                clearForLogout();
+            }
+        }
+        else if (CommunityEventsViewModel.FEEDBACK_PROPERTY.equals(evt.getPropertyName())) {
+            renderFeedback((CommunityEventsState) evt.getNewValue());
+        }
+        else {
+            renderList((CommunityEventsState) evt.getNewValue());
         }
     }
 
@@ -313,7 +317,11 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
     private void renderList(CommunityEventsState state) {
         updateCommunityOptions(state.getCommunities(), state.getSelectedCommunityId());
 
-        final String previouslySelected = selectedRow() == null ? null : selectedRow().getEventId();
+        final EventRow selectedBefore = selectedRow();
+        String previouslySelected = null;
+        if (selectedBefore != null) {
+            previouslySelected = selectedBefore.getEventId();
+        }
         rows = new ArrayList<>(state.getEvents());
         tableModel.setRowCount(0);
         int reselect = -1;
@@ -334,12 +342,21 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
         if (reselect >= 0) {
             eventTable.setRowSelectionInterval(reselect, reselect);
         }
-        listHintLabel.setText(rows.isEmpty() ? "No events in this community yet. Publish one!" : rows.size()
-                + " event(s)");
+        if (rows.isEmpty()) {
+            listHintLabel.setText("No events in this community yet. Publish one!");
+        }
+        else {
+            listHintLabel.setText(rows.size() + " event(s)");
+        }
         showSelectedEvent();
     }
 
-    /** Refills both community drop-downs when the list of communities changes. */
+    /**
+     * Refills both community drop-downs when the list of communities changes.
+     *
+     * @param communities communities to offer
+     * @param selectedId community to select in the filter drop-down
+     */
     private void updateCommunityOptions(List<CommunityOption> communities, String selectedId) {
         updatingFilter = true;
         if (!sameCommunities(communities)) {
@@ -353,7 +370,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
                 createCommunityModel.addElement(option);
             }
             selectById(createCommunityCombo, createCommunityModel,
-                    createSelection == null ? "" : ((CommunityOption) createSelection).getCommunityId());
+                    communityIdOf((CommunityOption) createSelection));
         }
         selectById(filterCombo, filterModel, selectedId);
         updatingFilter = false;
@@ -380,11 +397,14 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
         final EventRow row = selectedRow();
         if (row == null) {
             detailsArea.setText("Select an event to see its details.");
-            joinButton.setText("Join event");
+            joinButton.setText(JOIN_TEXT);
             joinButton.setEnabled(false);
         }
         else {
-            final String description = row.getDescription().isBlank() ? "(no description)" : row.getDescription();
+            String description = row.getDescription();
+            if (description.isBlank()) {
+                description = "(no description)";
+            }
             detailsArea.setText(row.getTitle() + "  -  " + row.getCommunityName() + "\n"
                     + row.getStartsAtDisplay() + " (Toronto time), organized by " + row.getCreatorDisplayName()
                     + "\n" + row.getJoinedCount() + " of " + row.getCapacity() + " spots taken\n\n"
@@ -411,7 +431,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
             text = "Event is full";
         }
         else {
-            text = "Join event";
+            text = JOIN_TEXT;
         }
         return text;
     }
@@ -444,12 +464,34 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
 
     private String selectedFilterId() {
         final CommunityOption selected = (CommunityOption) filterCombo.getSelectedItem();
-        return selected == null ? ALL_COMMUNITIES_ID : selected.getCommunityId();
+        String communityId = ALL_COMMUNITIES_ID;
+        if (selected != null) {
+            communityId = selected.getCommunityId();
+        }
+        return communityId;
+    }
+
+    private static String communityIdOf(CommunityOption option) {
+        String communityId = "";
+        if (option != null) {
+            communityId = option.getCommunityId();
+        }
+        return communityId;
     }
 
     private void showFeedback(String message, boolean error) {
-        feedbackLabel.setForeground(error ? ERROR_COLOR : SUCCESS_COLOR);
-        feedbackLabel.setText(message == null || message.isBlank() ? " " : message);
+        if (error) {
+            feedbackLabel.setForeground(ERROR_COLOR);
+        }
+        else {
+            feedbackLabel.setForeground(SUCCESS_COLOR);
+        }
+        if (message == null || message.isBlank()) {
+            feedbackLabel.setText(BLANK_LABEL);
+        }
+        else {
+            feedbackLabel.setText(message);
+        }
     }
 
     private void resetCreateForm() {
@@ -466,7 +508,7 @@ public final class CommunityEventsView extends JPanel implements PropertyChangeL
         updatingFilter = true;
         filterCombo.setSelectedIndex(0);
         updatingFilter = false;
-        listHintLabel.setText(" ");
+        listHintLabel.setText(BLANK_LABEL);
         showFeedback("", false);
         resetCreateForm();
         showSelectedEvent();

@@ -115,6 +115,9 @@ public final class BrowseEventsInteractor implements BrowseEventsInputBoundary {
     /**
      * Turns the requested filter into either {@link BrowseEventsInputData#ALL_COMMUNITIES} or a
      * lowercase community ID, matching how {@link Event} stores community IDs.
+     *
+     * @param communityId requested community ID
+     * @return the normalized filter
      */
     private static String normalizeFilter(String communityId) {
         final String filter;

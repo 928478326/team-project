@@ -8,16 +8,18 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import use_case.view_calendar.PublicHolidayGateway;
 
 /**
@@ -72,7 +74,7 @@ public final class NagerPublicHolidayGateway implements PublicHolidayGateway {
 
     @Override
     public List<PublicHoliday> fetchPublicHolidays(int year, String countryCode) {
-        final String country = countryCode == null ? "" : countryCode.trim().toUpperCase(Locale.ROOT);
+        final String country = Objects.requireNonNullElse(countryCode, "").trim().toUpperCase(Locale.ROOT);
         final String cacheKey = year + "/" + country;
         List<PublicHoliday> holidays = cache.get(cacheKey);
         if (holidays == null) {
@@ -139,6 +141,10 @@ public final class NagerPublicHolidayGateway implements PublicHolidayGateway {
     /**
      * A holiday counts if it is nationwide, or if its {@code counties} list includes our province.
      * The province filter only applies when the province belongs to the requested country.
+     *
+     * @param entry one holiday from the API response
+     * @param country requested country code, such as {@code CA}
+     * @return {@code true} if the holiday is observed in the configured province
      */
     private boolean isObservedHere(JSONObject entry, String country) {
         final boolean filterByProvince = provinceCode != null && provinceCode.startsWith(country + "-");

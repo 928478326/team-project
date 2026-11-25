@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import use_case.view_calendar.PublicHolidayGateway.PublicHoliday;
 
@@ -32,7 +33,8 @@ class NagerPublicHolidayGatewayTest {
             + "\"global\":false,\"counties\":[\"CA-MB\"]},"
             + "{\"date\":\"2026-02-16\",\"localName\":\"Family Day\",\"name\":\"Family Day\","
             + "\"global\":false,\"counties\":[\"CA-AB\",\"CA-BC\",\"CA-NB\",\"CA-ON\",\"CA-SK\"]},"
-            + "{\"date\":\"2026-06-24\",\"localName\":\"Fête nationale du Québec\",\"name\":\"National Holiday\","
+            + "{\"date\":\"2026-06-24\",\"localName\":\"F" + "\u00ea" + "te nationale du Qu" + "\u00e9" + "bec\","
+            + "\"name\":\"National Holiday\","
             + "\"global\":false,\"counties\":[\"CA-QC\"]},"
             + "{\"date\":\"not-a-date\",\"localName\":\"Broken\",\"name\":\"Broken\",\"global\":true},"
             + "{\"date\":\"2026-12-26\",\"localName\":\"Boxing Day\",\"name\":\"St. Stephen's Day\","
@@ -47,25 +49,27 @@ class NagerPublicHolidayGatewayTest {
 
     private NagerPublicHolidayGateway startGateway() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", exchange -> {
-            requests.incrementAndGet();
-            paths.add(exchange.getRequestURI().getPath());
-            final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-            if (status == 204) {
-                exchange.sendResponseHeaders(status, -1);
-            }
-            else {
-                exchange.sendResponseHeaders(status, bytes.length);
-                try (OutputStream out = exchange.getResponseBody()) {
-                    out.write(bytes);
-                }
-            }
-            exchange.close();
-        });
+        server.createContext("/", this::respond);
         server.start();
         return new NagerPublicHolidayGateway(
                 "http://127.0.0.1:" + server.getAddress().getPort() + "/api/v3/PublicHolidays",
                 NagerPublicHolidayGateway.DEFAULT_PROVINCE);
+    }
+
+    private void respond(HttpExchange exchange) throws IOException {
+        requests.incrementAndGet();
+        paths.add(exchange.getRequestURI().getPath());
+        final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        if (status == 204) {
+            exchange.sendResponseHeaders(status, -1);
+        }
+        else {
+            exchange.sendResponseHeaders(status, bytes.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+            }
+        }
+        exchange.close();
     }
 
     @AfterEach
