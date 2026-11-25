@@ -1,3 +1,4 @@
+
 package view;
 
 import interface_adapter.SessionState;
@@ -6,94 +7,334 @@ import interface_adapter.course_match.CourseMatchState;
 import interface_adapter.course_match.CourseMatchViewModel;
 import interface_adapter.course_match.EditScheduleController;
 import interface_adapter.course_match.MatchCourseBuddiesController;
+
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.List;
 import java.util.Objects;
-import javax.swing.BorderFactory;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 
 /**
- * Course Schedule &amp; Study Buddy Match Swing tab: manage UofT course/LEC/TUT schedule
- * and discover classmates filtered by All / Same LEC / Same TUT.
- *
- * <p><b>Owner: Track C (Course Matching &amp; Buddy Rating Lead)</b>
+ * Swing view for managing course schedules and finding study buddies.
  */
-public final class CourseMatchView extends JPanel implements PropertyChangeListener {
+public final class CourseMatchView extends JPanel
+    implements PropertyChangeListener {
 
     private final CourseMatchViewModel viewModel;
     private final SessionViewModel sessionViewModel;
-    private final JLabel statusLabel =
-            new JLabel("TODO [Track C]: Build CourseMatchView (Schedule Editor + Classmate Matches)");
 
     private EditScheduleController editScheduleController;
     private MatchCourseBuddiesController matchCourseBuddiesController;
 
+    private final JLabel statusLabel = new JLabel(" ");
+
+    private final JTextField courseCodeField = new JTextField(10);
+    private final JTextField lecField = new JTextField(8);
+    private final JTextField tutField = new JTextField(8);
+
+    private final JButton addButton = new JButton("Add / Update");
+    private final JButton removeButton = new JButton("Remove Selected");
+    private final JButton matchButton = new JButton("Find Matches");
+
+    private final JComboBox<String> filterBox =
+        new JComboBox<>(new String[]{
+            "ALL", "SAME_LEC", "SAME_TUT"
+        });
+
+    private final DefaultTableModel scheduleModel =
+        createReadOnlyModel(
+            "Course Code", "Title", "LEC", "TUT");
+
+    private final DefaultTableModel matchModel =
+        createReadOnlyModel(
+            "Buddy", "Score", "Shared Courses", "Contact");
+
+    private final JTable scheduleTable = new JTable(scheduleModel);
+    private final JTable matchTable = new JTable(matchModel);
+
+    private String activeUserId = "";
+
     public CourseMatchView(
-            CourseMatchViewModel viewModel, SessionViewModel sessionViewModel) {
-        this.viewModel = Objects.requireNonNull(viewModel, "viewModel must not be null");
+        CourseMatchViewModel viewModel,
+        SessionViewModel sessionViewModel) {
+
+        this.viewModel = Objects.requireNonNull(viewModel);
         this.sessionViewModel =
-                Objects.requireNonNull(sessionViewModel, "sessionViewModel must not be null");
-        this.viewModel.addPropertyChangeListener(this);
-        this.sessionViewModel.addPropertyChangeListener(this);
+            Objects.requireNonNull(sessionViewModel);
 
         setLayout(new BorderLayout(12, 12));
-        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-        add(statusLabel, BorderLayout.NORTH);
+        setBorder(BorderFactory.createEmptyBorder(
+            16, 16, 16, 16));
+
+        JPanel content = new JPanel(
+            new GridLayout(2, 1, 0, 12));
+
+        content.add(createSchedulePanel());
+        content.add(createMatchPanel());
+
+        add(content, BorderLayout.CENTER);
+        add(statusLabel, BorderLayout.SOUTH);
+
+        registerListeners();
+
+        this.viewModel.addPropertyChangeListener(this);
+        this.sessionViewModel.addPropertyChangeListener(this);
+    }
+
+    private JPanel createSchedulePanel() {
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+
+        panel.setBorder(BorderFactory.createTitledBorder(
+            "My Course Schedule"));
+
+        scheduleTable.setSelectionMode(
+            ListSelectionModel.SINGLE_SELECTION);
+
+        scheduleTable.setPreferredScrollableViewportSize(
+            new Dimension(800, 120));
+
+        panel.add(new JScrollPane(scheduleTable),
+            BorderLayout.CENTER);
+
+        JPanel controls = new JPanel(
+            new FlowLayout(FlowLayout.LEFT));
+
+        controls.add(new JLabel("Course Code:"));
+        controls.add(courseCodeField);
+
+        controls.add(new JLabel("LEC:"));
+        controls.add(lecField);
+
+        controls.add(new JLabel("TUT:"));
+        controls.add(tutField);
+
+        controls.add(addButton);
+        controls.add(removeButton);
+
+        panel.add(controls, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel createMatchPanel() {
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+
+        panel.setBorder(BorderFactory.createTitledBorder(
+            "Find Course Buddies"));
+
+        JPanel controls = new JPanel(
+            new FlowLayout(FlowLayout.LEFT));
+
+        controls.add(new JLabel("Filter:"));
+        controls.add(filterBox);
+        controls.add(matchButton);
+
+        panel.add(controls, BorderLayout.NORTH);
+
+        matchTable.setPreferredScrollableViewportSize(
+            new Dimension(800, 160));
+
+        matchTable.getColumnModel()
+            .getColumn(2).setPreferredWidth(350);
+
+        panel.add(new JScrollPane(matchTable),
+            BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private void registerListeners() {
+        addButton.addActionListener(e -> addCourse());
+
+        removeButton.addActionListener(e -> removeCourse());
+
+        matchButton.addActionListener(e -> findMatches());
+
+        filterBox.addActionListener(e -> findMatches());
+    }
+
+    private void addCourse() {
+        syncSession();
+
+        if (activeUserId.isBlank()
+            || editScheduleController == null) {
+            return;
+        }
+
+        invalidateMatches();
+
+        editScheduleController.addCourse(
+            activeUserId,
+            courseCodeField.getText(),
+            lecField.getText(),
+            tutField.getText());
+    }
+
+    private void removeCourse() {
+        syncSession();
+
+        if (activeUserId.isBlank()
+            || editScheduleController == null) {
+            return;
+        }
+
+        int selectedRow = scheduleTable.getSelectedRow();
+
+        if (selectedRow == -1) {
+            statusLabel.setText("Select a course to remove.");
+            return;
+        }
+
+        int modelRow =
+            scheduleTable.convertRowIndexToModel(selectedRow);
+
+        String courseCode =
+            (String) scheduleModel.getValueAt(modelRow, 0);
+
+        invalidateMatches();
+
+        editScheduleController.removeCourse(
+            activeUserId, courseCode);
+    }
+
+    private void findMatches() {
+        syncSession();
+
+        if (activeUserId.isBlank()
+            || matchCourseBuddiesController == null) {
+            return;
+        }
+
+        String filterMode =
+            (String) filterBox.getSelectedItem();
+
+        matchCourseBuddiesController.execute(
+            activeUserId, filterMode);
     }
 
     public String getViewName() {
         return viewModel.getViewName();
     }
 
-    public void setEditScheduleController(EditScheduleController editScheduleController) {
-        this.editScheduleController = editScheduleController;
+    public void setEditScheduleController(
+        EditScheduleController controller) {
+        this.editScheduleController = controller;
     }
 
     public void setMatchCourseBuddiesController(
-            MatchCourseBuddiesController matchCourseBuddiesController) {
-        this.matchCourseBuddiesController = matchCourseBuddiesController;
+        MatchCourseBuddiesController controller) {
+        this.matchCourseBuddiesController = controller;
     }
 
-    /**
-     * Triggered by {@link MainShellView} when this tab becomes visible.
-     */
     public void refreshData() {
+        syncSession();
+
+        if (!activeUserId.isBlank()
+            && editScheduleController != null) {
+
+            invalidateMatches();
+
+            editScheduleController.loadSchedule(activeUserId);
+        }
+    }
+
+    private void invalidateMatches() {
+        viewModel.getState().setMatches(List.of());
+        matchModel.setRowCount(0);
+    }
+
+    private void syncSession() {
         SessionState session = sessionViewModel.getState();
-        if (session.isLoggedIn() && editScheduleController != null) {
-            editScheduleController.loadSchedule(session.getUserId());
+
+        String currentUserId = session.isLoggedIn()
+            ? session.getUserId()
+            : "";
+
+        if (!currentUserId.equals(activeUserId)) {
+            activeUserId = currentUserId;
+
+            viewModel.setState(new CourseMatchState());
+
+            courseCodeField.setText("");
+            lecField.setText("");
+            tutField.setText("");
+
+            renderState();
         }
     }
 
     @Override
-    public void propertyChange(PropertyChangeEvent evt) {
-        Runnable updateTask =
-                () -> {
-                    if (evt.getSource() == sessionViewModel) {
-                        SessionState session = (SessionState) evt.getNewValue();
-                        if (session != null && !session.isLoggedIn()) {
-                            // TODO [Track C]: Clear schedule & match tables on logout.
-                            statusLabel.setText("Signed out.");
-                        }
-                        return;
-                    }
-                    if (evt.getSource() == viewModel) {
-                        CourseMatchState state = (CourseMatchState) evt.getNewValue();
-                        // TODO [Track C]: Render enrollments list, add/remove controls, filter toggles, and matches.
-                        String text = !state.getErrorMessage().isBlank()
-                                ? "Error: " + state.getErrorMessage()
-                                : state.getStatusMessage();
-                        if (!text.isBlank()) {
-                            statusLabel.setText(text);
-                        }
-                    }
-                };
+    public void propertyChange(PropertyChangeEvent event) {
+        Runnable updateTask = () -> {
+            if (event.getSource() == sessionViewModel) {
+                syncSession();
+            } else if (event.getSource() == viewModel) {
+                renderState();
+            }
+        };
+
         if (SwingUtilities.isEventDispatchThread()) {
             updateTask.run();
         } else {
             SwingUtilities.invokeLater(updateTask);
         }
+    }
+
+    private void renderState() {
+        CourseMatchState state = viewModel.getState();
+
+        scheduleModel.setRowCount(0);
+        matchModel.setRowCount(0);
+
+        if (activeUserId.isBlank()) {
+            statusLabel.setText("Signed out.");
+            return;
+        }
+
+        for (CourseMatchState.EnrollmentRow row
+            : state.getEnrollments()) {
+
+            scheduleModel.addRow(new Object[]{
+                row.getCourseCode(),
+                row.getCourseTitle(),
+                row.getLecSection(),
+                row.getTutSection()
+            });
+        }
+
+        for (CourseMatchState.MatchRow row
+            : state.getMatches()) {
+
+            matchModel.addRow(new Object[]{
+                row.getDisplayName(),
+                row.getMatchScore(),
+                String.join(", ", row.getOverlapSummaries()),
+                row.getContactInfo()
+            });
+        }
+
+        if (!state.getErrorMessage().isBlank()) {
+            statusLabel.setText(
+                "Error: " + state.getErrorMessage());
+        } else {
+            statusLabel.setText(state.getStatusMessage());
+        }
+    }
+
+    private static DefaultTableModel createReadOnlyModel(
+        String... columns) {
+
+        return new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
     }
 }
