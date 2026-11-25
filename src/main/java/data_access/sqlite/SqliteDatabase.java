@@ -5,9 +5,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import entity.PasswordHasher;
 
@@ -56,26 +59,48 @@ public final class SqliteDatabase {
     }
 
     /**
-     * Creates missing account, event, participation, and rating tables on startup.
-     * @throws IllegalStateException if the directory or schema cannot be created
+     * Initializes the account table on first launch and migrates pre-existing schemas idempotently
+     * so existing accounts retain safe defaults across restarts.
+     *
+     * @throws IllegalStateException if the directory or table cannot be created or migrated
      */
     public void initializeSchema() {
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
-            try (Connection connection = openConnection(); Statement sql = connection.createStatement()) {
-                connection.setAutoCommit(false);
-                sql.execute("CREATE TABLE IF NOT EXISTS users ("
-                        + "user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
-                        + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
-                        + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
-                        + "interested_communities TEXT NOT NULL)");
-                createMeetupTables(sql);
-                connection.commit();
+            try (Connection connection = openConnection();
+                    Statement sql = connection.createStatement()) {
+                initializeTables(sql);
             }
         }
         catch (IOException | SQLException ex) {
             throw new IllegalStateException("Could not initialize the CampusBuddy database.", ex);
         }
+    }
+
+    private void initializeTables(Statement sql) throws SQLException {
+        sql.execute("BEGIN IMMEDIATE");
+        try {
+            initializeUsers(sql);
+            createMeetupTables(sql);
+            sql.execute("COMMIT");
+        }
+        catch (SQLException ex) {
+            sql.execute("ROLLBACK");
+            throw ex;
+        }
+    }
+
+    private static void initializeUsers(Statement sql) throws SQLException {
+        sql.execute("CREATE TABLE IF NOT EXISTS users ("
+                + "user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
+                + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
+                + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
+                + "interested_communities TEXT NOT NULL, "
+                + "utorid TEXT NOT NULL DEFAULT '', "
+                + "share_contact_info INTEGER NOT NULL DEFAULT 1, "
+                + "uoft_verified INTEGER NOT NULL DEFAULT 0, "
+                + "llm_persona TEXT NOT NULL DEFAULT '')");
+        migrateUsersColumns(sql);
     }
 
     private void createMeetupTables(Statement sql) throws SQLException {
@@ -109,5 +134,26 @@ public final class SqliteDatabase {
         // TODO [Track A]: If SELECT COUNT(*) FROM users == 0, insert demo accounts
         // (james, herry, gracie, henry, alex), sample events, participations, enrollments, ratings.
         throw new UnsupportedOperationException("TODO [Track A]: Implement SqliteDatabase.seedDemoDataIfEmpty");
+    }
+
+    private static void migrateUsersColumns(Statement sql) throws SQLException {
+        final Set<String> columns = new LinkedHashSet<>();
+        try (ResultSet info = sql.executeQuery("PRAGMA table_info(users)")) {
+            while (info.next()) {
+                columns.add(info.getString("name"));
+            }
+        }
+        addColumnIfMissing(sql, columns, "utorid", "TEXT NOT NULL DEFAULT ''");
+        addColumnIfMissing(sql, columns, "share_contact_info", "INTEGER NOT NULL DEFAULT 1");
+        addColumnIfMissing(sql, columns, "uoft_verified", "INTEGER NOT NULL DEFAULT 0");
+        addColumnIfMissing(sql, columns, "llm_persona", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static void addColumnIfMissing(
+            Statement sql, Set<String> existingColumns, String columnName, String definition)
+            throws SQLException {
+        if (!existingColumns.contains(columnName)) {
+            sql.execute("ALTER TABLE users ADD COLUMN " + columnName + " " + definition);
+        }
     }
 }

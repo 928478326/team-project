@@ -36,8 +36,9 @@ class SqliteRatingTest {
             sql.execute("CREATE TABLE users (user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
                     + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
                     + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, interested_communities TEXT NOT NULL)");
+            sql.execute("INSERT INTO users VALUES ('henry', 'henry', 'old-hash', 'Henry', '', '', "
+                    + "'STUDY_FOCUS', '[]')");
         }
-        insertUser(database, "henry");
         database.initializeSchema();
         try (Connection connection = database.openConnection(); Statement sql = connection.createStatement();
                 ResultSet result = sql.executeQuery("SELECT username, (SELECT COUNT(*) FROM sqlite_master "

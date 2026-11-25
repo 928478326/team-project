@@ -208,7 +208,7 @@ public final class MatchCourseBuddiesInteractor
             candidate.getUserId(),
             candidate.getDisplayName(),
             candidate.getWeekendStyle().getDisplayName(),
-            candidate.getContactInfo(),
+            candidate.getPublicContactInfo(),
             score.getTotalScore(),
             summaries);
     }

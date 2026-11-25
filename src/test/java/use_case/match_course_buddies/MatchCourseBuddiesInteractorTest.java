@@ -6,6 +6,7 @@ import data_access.in_memory.InMemoryScheduleDataAccess;
 import data_access.in_memory.Sha256PasswordHasher;
 import entity.DefaultCourseMatchStrategy;
 import entity.CourseEnrollment;
+import entity.PrivateProfile;
 import entity.User;
 import java.util.Map;
 import java.util.Set;
@@ -21,10 +22,11 @@ class MatchCourseBuddiesInteractorTest {
 
   private MatchCourseBuddiesInteractor interactor;
   private TestPresenter presenter;
+  private InMemoryCampusBuddyStore store;
 
   @BeforeEach
   void setUp() {
-    InMemoryCampusBuddyStore store =
+    store =
         InMemoryCampusBuddyStore.createSeeded(
             new Sha256PasswordHasher());
 
@@ -60,6 +62,18 @@ class MatchCourseBuddiesInteractorTest {
 
     assertEquals("u-alex", matches.get(2).getUserId());
     assertEquals(10, matches.get(2).getMatchScore());
+  }
+
+  @Test
+  void matchingHonoursTheCandidatesContactPreference() {
+    final User gracie = store.usersById().get("u-gracie");
+    store.putUser(gracie.withPrivateProfile(new PrivateProfile("", false)));
+    interactor.execute(new MatchCourseBuddiesInputData("u-henry", "ALL"));
+    assertEquals(PrivateProfile.HIDDEN_CONTACT_PLACEHOLDER, presenter.output.getMatches().get(0).getContactInfo());
+
+    store.putUser(gracie.withPrivateProfile(new PrivateProfile("", true)));
+    interactor.execute(new MatchCourseBuddiesInputData("u-henry", "ALL"));
+    assertEquals(gracie.getContactInfo(), presenter.output.getMatches().get(0).getContactInfo());
   }
 
   @Test
