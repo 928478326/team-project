@@ -11,6 +11,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,6 +31,7 @@ import entity.WeekendStyle;
 
 class SqliteAccountTest {
 
+    private static final int TIMEOUT_SECONDS = 10;
     private static final int LEGACY_USERNAME_LENGTH = 81;
     private static final int LEGACY_BIO_LENGTH = 520;
 
@@ -132,7 +139,23 @@ class SqliteAccountTest {
                     + "', 'discord: legacy', 'INDOOR_CHILL', '[\"study\"]')");
         }
 
-        final SqliteDataAccessBundle migrated = new SqliteDataAccessBundle(dbFile.toString());
+        final CyclicBarrier ready = new CyclicBarrier(2);
+        final ExecutorService pool = Executors.newFixedThreadPool(2);
+        final Callable<SqliteDataAccessBundle> open = () -> {
+            ready.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return new SqliteDataAccessBundle(dbFile.toString());
+        };
+        final SqliteDataAccessBundle migrated;
+        try {
+            final Future<SqliteDataAccessBundle> first = pool.submit(open);
+            final Future<SqliteDataAccessBundle> second = pool.submit(open);
+            migrated = first.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertTrue(second.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .loginDataAccess().findByUsername(longUsername).isPresent());
+        }
+        finally {
+            pool.shutdownNow();
+        }
         final User loaded =
                 migrated.loginDataAccess().findByUsername(longUsername).orElseThrow();
         assertEquals(longUsername, loaded.getDisplayName());

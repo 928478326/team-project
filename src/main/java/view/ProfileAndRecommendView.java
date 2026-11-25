@@ -28,6 +28,7 @@ import interface_adapter.recommendation.RecommendationViewModel;
 
 /** Signed-in profile editor with an owner-only settings section and a saved match card preview. */
 public final class ProfileAndRecommendView extends JPanel implements PropertyChangeListener {
+    private static final String RETRY_LOAD = "Retry load";
     private static final Color ERROR = new Color(0x9B302C);
     private static final double EDITOR_WEIGHT = 0.62;
     private final RecommendationViewModel viewModel;
@@ -35,7 +36,7 @@ public final class ProfileAndRecommendView extends JPanel implements PropertyCha
     private final ProfileEditorPanel editor = new ProfileEditorPanel();
     private final ProfilePreviewPanel preview = new ProfilePreviewPanel();
     private final JButton save = new JButton("Save Profile");
-    private final JButton retry = new JButton("Retry load");
+    private final JButton retry = new JButton(RETRY_LOAD);
     private final JLabel feedback = new JLabel(" ");
     private final Set<String> savingOwners = new HashSet<>();
     private EditProfileController editProfileController;
@@ -84,7 +85,7 @@ public final class ProfileAndRecommendView extends JPanel implements PropertyCha
         actions.setOpaque(false);
         final JPanel buttons = new JPanel(new FlowLayout(FlowLayout.TRAILING, 0, 0));
         buttons.setOpaque(false);
-        retry.addActionListener(event -> refreshData());
+        retry.addActionListener(event -> reloadProfile());
         save.addActionListener(event -> saveProfile());
         save.setForeground(Color.WHITE);
         save.setBackground(ProfileLayout.TEAL);
@@ -113,7 +114,14 @@ public final class ProfileAndRecommendView extends JPanel implements PropertyCha
     /** Loads the active account on tab entry and keeps unsaved edits when switching between tabs. */
     public void refreshData() {
         syncOwner();
-        if (!owner.isEmpty() && !loaded && !savingOwners.contains(owner) && editProfileController != null) {
+        if (!loaded) {
+            reloadProfile();
+        }
+    }
+
+    private void reloadProfile() {
+        syncOwner();
+        if (!owner.isEmpty() && !savingOwners.contains(owner) && editProfileController != null) {
             editProfileController.loadProfile(owner);
         }
     }
@@ -151,7 +159,11 @@ public final class ProfileAndRecommendView extends JPanel implements PropertyCha
             final RecommendationState state = viewModel.getState();
             if (!state.getErrorMessage().isEmpty()) {
                 message(state.getErrorMessage(), true);
-                retry.setVisible(!loaded);
+                retry.setText(RETRY_LOAD);
+                if (loaded) {
+                    retry.setText("Discard edits and reload");
+                }
+                retry.setVisible(true);
             }
             else if (!state.getDisplayName().isEmpty()) {
                 editor.populate(state);
@@ -168,6 +180,7 @@ public final class ProfileAndRecommendView extends JPanel implements PropertyCha
         final boolean editable = loaded && !savingOwners.contains(owner);
         editor.allowEditing(editable);
         save.setEnabled(editable);
+        retry.setEnabled(!owner.isEmpty() && !savingOwners.contains(owner));
     }
 
     private void message(String text, boolean error) {

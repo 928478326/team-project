@@ -1,5 +1,6 @@
 package data_access.gateway;
 
+import java.util.StringJoiner;
 import java.util.TreeSet;
 
 import entity.LlmPersona;
@@ -10,19 +11,13 @@ public final class RuleBasedProfileEnrichmentGateway implements LlmProfileEnrich
 
     @Override
     public LlmPersona enrichPersona(SanitizedProfileSnapshot snapshot) {
-        final StringBuilder summary = new StringBuilder("Weekend preference: ")
-                .append(snapshot.getWeekendStyleText());
-        if (!snapshot.getBio().isBlank()) {
-            summary.append(". Bio: ").append(snapshot.getBio());
+        final StringJoiner summary = new StringJoiner(". ");
+        if (!snapshot.getWeekendStyleText().isEmpty()) {
+            summary.add("Weekend preference: " + snapshot.getWeekendStyleText());
         }
         if (!snapshot.getInterestedCommunityIds().isEmpty()) {
-            summary.append(". Communities: ")
-                    .append(String.join(", ", new TreeSet<>(snapshot.getInterestedCommunityIds())));
+            summary.add("Communities: " + String.join(", ", new TreeSet<>(snapshot.getInterestedCommunityIds())));
         }
-        int end = Math.min(summary.length(), LlmPersona.MAX_SUMMARY_LENGTH);
-        if (end < summary.length() && Character.isHighSurrogate(summary.charAt(end - 1))) {
-            end--;
-        }
-        return LlmPersona.of(summary.substring(0, end));
+        return LlmPersona.of(summary.toString());
     }
 }

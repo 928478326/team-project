@@ -152,6 +152,20 @@ class ProfileAndRecommendViewTest {
     }
 
     @Test
+    void aConflictingSaveKeepsTheDraftUntilTheStudentExplicitlyReloads() throws Exception {
+        onEdt(() -> {
+            text(NAME).setText("My unsaved edit");
+            presenter.prepareFailView("Alex", "Your profile changed during this save. Reload it and try again.");
+            assertEquals("My unsaved edit", text(NAME).getText());
+            assertTrue(button("Discard edits and reload").isVisible());
+            button("Discard edits and reload").doClick();
+            assertEquals("Alex", text(NAME).getText());
+            assertEquals("Profile loaded.", label("Profile loaded.").getText());
+            return null;
+        });
+    }
+
+    @Test
     void logoutDuringSaveDiscardsLateFailureForThePreviousOwner() throws Exception {
         onEdt(() -> {
             button(SAVE).doClick();

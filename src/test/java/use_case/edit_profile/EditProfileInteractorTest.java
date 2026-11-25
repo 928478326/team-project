@@ -215,7 +215,7 @@ class EditProfileInteractorTest {
         final LlmProfileEnrichmentGateway fakeLlmGateway = snapshot -> {
             captured.add(snapshot);
             return LlmPersona.of(
-                    "Synthesized: " + snapshot.getWeekendStyleText() + " | " + snapshot.getBio());
+                    "Synthesized: " + snapshot.getInterestedCommunityIds());
         };
         final EditProfileInputBoundary interactor =
                 new EditProfileInteractor(fakeDao, fakePresenter, fakeLlmGateway);
@@ -223,21 +223,19 @@ class EditProfileInteractorTest {
         final EditProfileInputData input = new EditProfileInputData(
                 "u-henry",
                 EditProfileInputData.Action.SAVE,
-                "Henry Zhou",
-                "Loves quiet evening study",
+                "henry",
+                "Contact me at personal@example.invalid",
                 "discord: private_handle",
-                "Sunday cafe study & bubble tea",
-                Set.of("study", "food"))
+                "Contact me at personal@example.invalid",
+                Set.of("study", "food", "personal@example.invalid"))
                 .withPrivateSettings("ZhouHaol07", false);
         interactor.execute(input);
 
         assertEquals(1, fakePresenter.successCalls);
         assertEquals(1, captured.size());
-        assertEquals("Henry Zhou", captured.get(0).getDisplayName());
-        assertEquals("Loves quiet evening study", captured.get(0).getBio());
-        assertEquals("Sunday cafe study & bubble tea", captured.get(0).getWeekendStyleText());
+        assertEquals("", captured.get(0).getWeekendStyleText());
         assertEquals(Set.of("study", "food"), captured.get(0).getInterestedCommunityIds());
-        assertTrue(captured.get(0).getExistingPersona().isEmpty());
+        assertEquals("Contact me at personal@example.invalid", fakePresenter.lastSuccess.getBio());
 
         final User persisted = fakeDao.findUserById("u-henry").orElseThrow();
         assertEquals("zhouhaol07", persisted.getPrivateProfile().getUtorid());
@@ -349,6 +347,15 @@ class EditProfileInteractorTest {
                 throw new IllegalStateException("Could not read account.");
             }
             return Optional.ofNullable(users.get(userId));
+        }
+
+        @Override
+        public boolean updateIfUnchanged(User expected, User updated) {
+            final boolean matches = users.get(updated.getUserId()).hasSameProfileAs(expected);
+            if (matches) {
+                updateUserProfile(updated);
+            }
+            return matches;
         }
 
         @Override

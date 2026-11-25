@@ -69,7 +69,7 @@ class EditProfilePersistenceTest {
         assertFalse(state.isUoftVerified());
         final User loaded = data.loginDataAccess().findByUsername("rowan").orElseThrow();
         assertEquals(PrivateProfile.HIDDEN_CONTACT_PLACEHOLDER, loaded.getPublicContactInfo());
-        assertEquals("Weekend preference: Walks by the lake. Bio: Studies outdoors. Communities: study",
+        assertEquals("Communities: study",
                 loaded.getLlmPersona().getSummary());
     }
 
