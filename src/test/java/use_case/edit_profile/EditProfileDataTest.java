@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-
 /**
  * Unit tests verifying null-safety and immutability contracts of {@link EditProfileInputData},
  * {@link EditProfileOutputData}, and {@link LlmProfileEnrichmentGateway.SanitizedProfileSnapshot}.

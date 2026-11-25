@@ -250,6 +250,27 @@ class EditProfileInteractorTest {
     }
 
     @Test
+    void unstructuredPreferencesStayLocalAndKeepThePreviousSummary() {
+        final FakeEditProfileDataAccess storage = new FakeEditProfileDataAccess();
+        final String contact = "local@example.invalid";
+        final User student = new User("student", "student", "fixture-hash",
+                new PublicProfile("student", "", contact, WeekendStyle.STUDY_FOCUS, Set.of()),
+                new PrivateProfile("privateid", false), LlmPersona.of("Previous " + contact));
+        storage.seed(student);
+        final FakeEditProfilePresenter presenter = new FakeEditProfilePresenter();
+        final EditProfileInteractor interactor = new EditProfileInteractor(storage, presenter, snapshot -> {
+            throw new AssertionError("A save with only custom text should stay local");
+        });
+        interactor.execute(new EditProfileInputData("student", EditProfileInputData.Action.SAVE,
+                "student", contact, contact, "Saturday " + contact, Set.of(contact)));
+        assertEquals(1, presenter.successCalls);
+        final User saved = storage.findUserById("student").orElseThrow();
+        assertEquals(student.getLlmPersona(), saved.getLlmPersona());
+        assertEquals(contact, saved.getBio());
+        assertEquals("Saturday " + contact, saved.getWeekendStyle().getDisplayName());
+    }
+
+    @Test
     void testSaveDegradesGracefullyWhenLlmGatewayThrowsOrReturnsNull() {
         final FakeEditProfileDataAccess fakeDao = new FakeEditProfileDataAccess();
         final LlmPersona prior = LlmPersona.of("Existing persona");
