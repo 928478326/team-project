@@ -46,12 +46,11 @@ public final class EditScheduleInteractor
                     break;
 
                 case ADD:
-                    CourseEnrollment enrollment =
-                        new CourseEnrollment(
-                            userId,
-                            inputData.getCourseCode(),
-                            inputData.getLecSection(),
-                            inputData.getTutSection());
+                    CourseEnrollment enrollment = new CourseEnrollment(
+                        userId,
+                        inputData.getCourseCode(),
+                        inputData.getLecSection(),
+                        inputData.getTutSection());
 
                     dataAccess.saveEnrollment(enrollment);
                     statusMessage = "Course saved successfully.";
@@ -71,30 +70,33 @@ public final class EditScheduleInteractor
                         "Unsupported action.");
                     return;
             }
+
+            List<CourseEnrollment> enrollments =
+                dataAccess.findEnrollmentsByUser(userId);
+
+            List<EditScheduleOutputData.EnrollmentItem> items =
+                new ArrayList<>();
+
+            for (CourseEnrollment enrollment : enrollments) {
+                String courseTitle = catalogGateway
+                    .findCourseTitle(enrollment.getCourseCode())
+                    .orElse("");
+
+                items.add(new EditScheduleOutputData.EnrollmentItem(
+                    enrollment.getCourseCode(),
+                    courseTitle,
+                    enrollment.getLecSection(),
+                    enrollment.getTutSection()));
+            }
+
+            outputBoundary.prepareSuccessView(
+                new EditScheduleOutputData(items, statusMessage));
+
         } catch (IllegalArgumentException exception) {
             outputBoundary.prepareFailView(exception.getMessage());
-            return;
+        } catch (UnsupportedOperationException | IllegalStateException exception) {
+            outputBoundary.prepareFailView(
+                "Schedule storage is unavailable. Please try again.");
         }
-
-        List<CourseEnrollment> enrollments =
-            dataAccess.findEnrollmentsByUser(userId);
-
-        List<EditScheduleOutputData.EnrollmentItem> items =
-            new ArrayList<>();
-
-        for (CourseEnrollment enrollment : enrollments) {
-            String courseTitle = catalogGateway
-                .findCourseTitle(enrollment.getCourseCode())
-                .orElse("");
-
-            items.add(new EditScheduleOutputData.EnrollmentItem(
-                enrollment.getCourseCode(),
-                courseTitle,
-                enrollment.getLecSection(),
-                enrollment.getTutSection()));
-        }
-
-        outputBoundary.prepareSuccessView(
-            new EditScheduleOutputData(items, statusMessage));
     }
 }

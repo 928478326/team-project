@@ -5,6 +5,10 @@ import data_access.in_memory.InMemoryCampusBuddyStore;
 import data_access.in_memory.InMemoryScheduleDataAccess;
 import data_access.in_memory.Sha256PasswordHasher;
 import entity.DefaultCourseMatchStrategy;
+import entity.CourseEnrollment;
+import entity.User;
+import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -180,6 +184,42 @@ class MatchCourseBuddiesInteractorTest {
     assertEquals("No matching buddies found.",
         presenter.output.getInfoMessage());
     assertNull(presenter.error);
+  }
+
+  @Test
+  void testStorageUnavailable() {
+    MatchCourseBuddiesDataAccessInterface unavailableStorage =
+        new MatchCourseBuddiesDataAccessInterface() {
+
+          @Override
+          public List<CourseEnrollment> findEnrollmentsByUser(String userId) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public List<CourseEnrollment> findEnrollmentsByCourseCodes(
+              Set<String> courseCodes) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Map<String, User> findUsersByIds(Set<String> userIds) {
+            throw new UnsupportedOperationException();
+          }
+        };
+
+    interactor = new MatchCourseBuddiesInteractor(
+        unavailableStorage,
+        new DefaultCourseMatchStrategy(),
+        presenter);
+
+    interactor.execute(new MatchCourseBuddiesInputData(
+        "u-henry", "ALL"));
+
+    assertNull(presenter.output);
+    assertEquals(
+        "Course matching storage is unavailable. Please try again.",
+        presenter.error);
   }
 
 

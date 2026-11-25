@@ -55,6 +55,15 @@ public final class MatchCourseBuddiesInteractor
             return;
         }
 
+        try {
+            findMatches(userId, filterMode);
+        } catch (UnsupportedOperationException | IllegalStateException exception) {
+            outputBoundary.prepareFailView(
+                "Course matching storage is unavailable. Please try again.");
+        }
+    }
+
+    private void findMatches(String userId, String filterMode) {
         // Load the current user's schedule.
         List<CourseEnrollment> myEnrollments =
             dataAccess.findEnrollmentsByUser(userId);

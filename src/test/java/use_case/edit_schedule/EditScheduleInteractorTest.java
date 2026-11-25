@@ -5,6 +5,10 @@ import data_access.in_memory.InMemoryCampusBuddyStore;
 import data_access.in_memory.InMemoryScheduleDataAccess;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import entity.CourseEnrollment;
+import java.util.List;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -114,6 +118,43 @@ class EditScheduleInteractorTest {
 
     assertNotNull(presenter.error);
     assertNull(presenter.output);
+  }
+
+  @ParameterizedTest
+  @EnumSource(EditScheduleInputData.Action.class)
+  void testStorageUnavailable(EditScheduleInputData.Action action) {
+    EditScheduleDataAccessInterface unavailableStorage =
+        new EditScheduleDataAccessInterface() {
+
+          @Override
+          public List<CourseEnrollment> findEnrollmentsByUser(String userId) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public void saveEnrollment(CourseEnrollment enrollment) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public void deleteEnrollment(String userId, String courseCode) {
+            throw new UnsupportedOperationException();
+          }
+        };
+
+    interactor = new EditScheduleInteractor(
+        unavailableStorage,
+        new LocalUoftCourseCatalogGateway(),
+        presenter);
+
+    interactor.execute(new EditScheduleInputData(
+        USER_ID, action,
+        "CSC207H1F", "LEC0101", "TUT0201"));
+
+    assertNull(presenter.output);
+    assertEquals(
+        "Schedule storage is unavailable. Please try again.",
+        presenter.error);
   }
 
   private static class TestPresenter
