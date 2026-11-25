@@ -126,6 +126,7 @@ public final class SqliteUserDataAccess
     public boolean updateIfUnchanged(User expected, User updated) {
         try (Connection connection = database.openConnection(); Statement transaction = connection.createStatement()) {
             transaction.execute("BEGIN IMMEDIATE");
+            boolean committed = false;
             try {
                 final Optional<User> current = find(connection, "SELECT * FROM users WHERE user_id = ?",
                         updated.getUserId());
@@ -134,11 +135,13 @@ public final class SqliteUserDataAccess
                     writeProfile(connection, updated);
                 }
                 transaction.execute("COMMIT");
+                committed = true;
                 return matches;
             }
-            catch (SQLException | RuntimeException ex) {
-                transaction.execute("ROLLBACK");
-                throw ex;
+            finally {
+                if (!committed) {
+                    transaction.execute("ROLLBACK");
+                }
             }
         }
         catch (SQLException ex) {
