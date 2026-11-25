@@ -31,3 +31,9 @@ Run `mvn clean verify` for the tests, including the architecture dependency chec
 Saving a profile generates an internal preference summary from the student’s weekend style, bio, and interest communities. To enable Gemini, set `CAMPUSBUDDY_LLM_API_KEY` in the environment before launch. The request includes the display name, bio, weekend style, selected communities, and previous summary. The UTORid and contact fields stay in the application.
 
 Without a key, or if the service fails, the app generates the summary locally. SQLite mode persists it with the profile across launches. Both this mode and the in-memory demo use the same gateway.
+
+## Try the profile editor
+
+To see a populated profile immediately, run `app.Main` with `--dev-user=henry` and select **Profile & Recommend**. The left side shows the signed-in student’s editable profile and private settings. The match card on the right shows the saved public details.
+
+For a persistence demo, run with `--sqlite`, sign up or log in, and open **Profile & Recommend**. Type a custom weekend style, select communities, and set contact sharing under **Private Settings**. Click **Save Profile**. Quit and relaunch from the same directory, then log back in to see the saved profile. A recorded UTORid stays pending until verification.
