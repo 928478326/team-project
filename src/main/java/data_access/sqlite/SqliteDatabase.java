@@ -69,20 +69,24 @@ public final class SqliteDatabase {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (Connection connection = openConnection();
                     Statement sql = connection.createStatement()) {
-                sql.execute("BEGIN IMMEDIATE");
-                try {
-                    initializeUsers(sql);
-                    createMeetupTables(sql);
-                    sql.execute("COMMIT");
-                }
-                catch (SQLException ex) {
-                    sql.execute("ROLLBACK");
-                    throw ex;
-                }
+                initializeTables(sql);
             }
         }
         catch (IOException | SQLException ex) {
             throw new IllegalStateException("Could not initialize the CampusBuddy database.", ex);
+        }
+    }
+
+    private void initializeTables(Statement sql) throws SQLException {
+        sql.execute("BEGIN IMMEDIATE");
+        try {
+            initializeUsers(sql);
+            createMeetupTables(sql);
+            sql.execute("COMMIT");
+        }
+        catch (SQLException ex) {
+            sql.execute("ROLLBACK");
+            throw ex;
         }
     }
 
