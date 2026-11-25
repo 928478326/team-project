@@ -54,7 +54,6 @@ public final class MainShellView extends JPanel implements PropertyChangeListene
 
         JPanel leftHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         leftHeader.add(titleLabel);
-        leftHeader.add(tabButtonsPanel);
 
         JPanel rightHeader = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightHeader.add(userLabel);
@@ -62,6 +61,9 @@ public final class MainShellView extends JPanel implements PropertyChangeListene
 
         headerPanel.add(leftHeader, BorderLayout.CENTER);
         headerPanel.add(rightHeader, BorderLayout.EAST);
+        // The tab buttons get a full-width row of their own. Sharing a FlowLayout row with the title
+        // made them wrap onto a second line that the header's one-row height then cut off.
+        headerPanel.add(tabButtonsPanel, BorderLayout.SOUTH);
 
         logoutButton.addActionListener(
                 e -> {

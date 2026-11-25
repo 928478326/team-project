@@ -3,6 +3,7 @@ package interface_adapter.community;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * UI state for the Community Events view.
@@ -13,6 +14,7 @@ public final class CommunityEventsState {
 
     private String selectedCommunityId = "ALL";
     private List<EventRow> events = Collections.emptyList();
+    private List<CommunityOption> communities = Collections.emptyList();
     private String statusMessage = "";
     private String errorMessage = "";
     private boolean clearCreateForm;
@@ -22,7 +24,7 @@ public final class CommunityEventsState {
     }
 
     public void setSelectedCommunityId(String selectedCommunityId) {
-        this.selectedCommunityId = selectedCommunityId == null ? "ALL" : selectedCommunityId;
+        this.selectedCommunityId = Objects.requireNonNullElse(selectedCommunityId, "ALL");
     }
 
     public List<EventRow> getEvents() {
@@ -30,9 +32,17 @@ public final class CommunityEventsState {
     }
 
     public void setEvents(List<EventRow> events) {
-        this.events = events == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(events));
+        this.events = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(events, Collections.emptyList())));
+    }
+
+    public List<CommunityOption> getCommunities() {
+        return communities;
+    }
+
+    public void setCommunities(List<CommunityOption> communities) {
+        this.communities = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(communities, Collections.emptyList())));
     }
 
     public String getStatusMessage() {
@@ -40,7 +50,7 @@ public final class CommunityEventsState {
     }
 
     public void setStatusMessage(String statusMessage) {
-        this.statusMessage = statusMessage == null ? "" : statusMessage;
+        this.statusMessage = Objects.requireNonNullElse(statusMessage, "");
     }
 
     public String getErrorMessage() {
@@ -48,7 +58,7 @@ public final class CommunityEventsState {
     }
 
     public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage == null ? "" : errorMessage;
+        this.errorMessage = Objects.requireNonNullElse(errorMessage, "");
     }
 
     public boolean isClearCreateForm() {
@@ -57,6 +67,34 @@ public final class CommunityEventsState {
 
     public void setClearCreateForm(boolean clearCreateForm) {
         this.clearCreateForm = clearCreateForm;
+    }
+
+    /**
+     * One community choice for the filter and create-event drop-downs.
+     */
+    public static final class CommunityOption {
+
+        private final String communityId;
+        private final String name;
+
+        public CommunityOption(String communityId, String name) {
+            this.communityId = communityId;
+            this.name = name;
+        }
+
+        public String getCommunityId() {
+            return communityId;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        /** Shown by Swing combo boxes. */
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 
     /**

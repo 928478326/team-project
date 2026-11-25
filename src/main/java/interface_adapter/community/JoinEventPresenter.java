@@ -1,11 +1,15 @@
 package interface_adapter.community;
 
 import java.util.Objects;
+
 import use_case.join_event.JoinEventOutputBoundary;
 import use_case.join_event.JoinEventOutputData;
 
 /**
  * Presenter for joining a community event.
+ *
+ * <p>Only the message is updated here. The view reloads the list right after a join attempt,
+ * so seat counts always come from storage rather than being patched in place.
  *
  * <p><b>Owner: Track B (Community &amp; Calendar Lead)</b>
  */
@@ -19,20 +23,19 @@ public final class JoinEventPresenter implements JoinEventOutputBoundary {
 
     @Override
     public void prepareSuccessView(JoinEventOutputData outputData) {
-        // TODO [Track B]: Update the matching EventRow in state (or trigger refresh) and show message.
-        CommunityEventsState state = viewModel.getState();
+        final CommunityEventsState state = viewModel.getState();
         state.setErrorMessage("");
         state.setClearCreateForm(false);
         state.setStatusMessage(outputData.getMessage());
-        viewModel.firePropertyChanged();
+        viewModel.firePropertyChanged(CommunityEventsViewModel.FEEDBACK_PROPERTY);
     }
 
     @Override
     public void prepareFailView(String errorMessage) {
-        CommunityEventsState state = viewModel.getState();
+        final CommunityEventsState state = viewModel.getState();
         state.setStatusMessage("");
         state.setClearCreateForm(false);
         state.setErrorMessage(errorMessage);
-        viewModel.firePropertyChanged();
+        viewModel.firePropertyChanged(CommunityEventsViewModel.FEEDBACK_PROPERTY);
     }
 }

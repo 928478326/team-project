@@ -5,12 +5,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Immutable output data for a student's monthly calendar view.
  */
 public final class ViewCalendarOutputData {
 
+    private final String userId;
     private final int year;
     private final int month;
     private final String zoneId;
@@ -18,23 +20,38 @@ public final class ViewCalendarOutputData {
     private final List<HolidayItem> holidays;
     private final String statusMessage;
 
+    /**
+     * Creates the output for one student's month.
+     *
+     * @param userId the student this calendar belongs to
+     * @param year calendar year
+     * @param month calendar month (1-12)
+     * @param zoneId zone the times are shown in
+     * @param events joined events in that month
+     * @param holidays public holidays in that month
+     * @param statusMessage optional confirmation, such as a finished export
+     */
     public ViewCalendarOutputData(
+            String userId,
             int year,
             int month,
             String zoneId,
             List<CalendarEventItem> events,
             List<HolidayItem> holidays,
             String statusMessage) {
+        this.userId = Objects.requireNonNullElse(userId, "");
         this.year = year;
         this.month = month;
         this.zoneId = zoneId;
-        this.events = events == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(events));
-        this.holidays = holidays == null
-                ? Collections.emptyList()
-                : Collections.unmodifiableList(new ArrayList<>(holidays));
-        this.statusMessage = statusMessage == null ? "" : statusMessage;
+        this.events = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(events, Collections.emptyList())));
+        this.holidays = Collections.unmodifiableList(
+                new ArrayList<>(Objects.requireNonNullElse(holidays, Collections.emptyList())));
+        this.statusMessage = Objects.requireNonNullElse(statusMessage, "");
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     public int getYear() {
