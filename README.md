@@ -80,3 +80,9 @@ sequenceDiagram
 Set `CAMPUSBUDDY_LLM_API_KEY` to generate a preference summary with Gemini. Requests contain the selected built-in weekend preset and recognized community IDs. Names, bios, custom weekend text, contact details, UTORids and previous summaries stay in the application.
 
 Without a key or when the service fails, the app builds the summary locally from the same categories. If no category is selected, the saved summary is preserved. SQLite stores it with the profile across launches.
+
+## Try the profile editor
+
+To see a populated profile immediately, run `app.Main` with `--dev-user=henry` and select **Profile & Recommend**. The left side shows the signed-in student’s editable profile and private settings. The match card on the right shows the saved public details.
+
+For a persistence demo, run with `--sqlite`, sign up or log in, and open **Profile & Recommend**. Type a custom weekend style, select communities, and set contact sharing under **Private Settings**. Click **Save Profile**. Quit and relaunch from the same directory, then log back in to see the saved profile. A recorded UTORid stays pending until verification.
