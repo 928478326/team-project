@@ -56,23 +56,47 @@ public final class SqliteDatabase {
     }
 
     /**
-     * Initializes the account table on first launch and preserves existing accounts on restart.
-     * @throws IllegalStateException if the directory or table cannot be created
+     * Creates missing account, event, participation, and rating tables on startup.
+     * @throws IllegalStateException if the directory or schema cannot be created
      */
     public void initializeSchema() {
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (Connection connection = openConnection(); Statement sql = connection.createStatement()) {
+                connection.setAutoCommit(false);
                 sql.execute("CREATE TABLE IF NOT EXISTS users ("
                         + "user_id TEXT PRIMARY KEY NOT NULL, username TEXT UNIQUE NOT NULL, "
                         + "password_hash TEXT NOT NULL, display_name TEXT NOT NULL, bio TEXT NOT NULL, "
                         + "contact_info TEXT NOT NULL, weekend_style TEXT NOT NULL, "
                         + "interested_communities TEXT NOT NULL)");
+                createMeetupTables(sql);
+                connection.commit();
             }
         }
         catch (IOException | SQLException ex) {
-            throw new IllegalStateException("Could not initialize the account database.", ex);
+            throw new IllegalStateException("Could not initialize the CampusBuddy database.", ex);
         }
+    }
+
+    private void createMeetupTables(Statement sql) throws SQLException {
+        sql.execute("CREATE TABLE IF NOT EXISTS communities (community_id TEXT PRIMARY KEY NOT NULL, "
+                + "name TEXT NOT NULL)");
+        sql.execute("CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY NOT NULL, "
+                + "community_id TEXT NOT NULL REFERENCES communities(community_id), "
+                + "creator_id TEXT NOT NULL REFERENCES users(user_id), title TEXT NOT NULL, "
+                + "description TEXT NOT NULL, capacity INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 100), "
+                + "starts_at_ms INTEGER NOT NULL)");
+        sql.execute("CREATE TABLE IF NOT EXISTS participations (user_id TEXT NOT NULL REFERENCES users(user_id), "
+                + "event_id TEXT NOT NULL REFERENCES events(event_id), joined_at_ms INTEGER NOT NULL, "
+                + "PRIMARY KEY (user_id, event_id))");
+        sql.execute("CREATE INDEX IF NOT EXISTS participants_by_event ON participations (event_id, user_id)");
+        sql.execute("CREATE TABLE IF NOT EXISTS buddy_ratings (rater_id TEXT NOT NULL, ratee_id TEXT NOT NULL, "
+                + "event_id TEXT NOT NULL, score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5), "
+                + "would_meet_again INTEGER NOT NULL CHECK (would_meet_again IN (0, 1)), comment TEXT NOT NULL, "
+                + "rated_at_ms INTEGER NOT NULL, PRIMARY KEY (rater_id, ratee_id, event_id), "
+                + "CHECK (rater_id <> ratee_id), "
+                + "FOREIGN KEY (rater_id, event_id) REFERENCES participations(user_id, event_id), "
+                + "FOREIGN KEY (ratee_id, event_id) REFERENCES participations(user_id, event_id))");
     }
 
     /**
